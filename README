@@ -1,0 +1,53 @@
+== Type validator ==
+
+* Type validator is a Python module for validating Python objects from
+  untrusted source
+* It was developed for a P2P application that sends and receives bencoded
+  messages from network (see http://en.wikipedia.org/wiki/Bencode )
+* It is recommended that type validator is used with type validator
+* The reference implementation is in public domain (you may do whatever
+  you want with the code) 
+
+== Motivational background ==
+
+* XML is a widely used serialization format but it is somewhat bloated
+  for network protocols
+* Want a Pythonish approach for network serialization that is safe and
+  supports binary data (Python 2.x strings are binary safe)
+* Minimize risks and code for validating network messages 
+
+== How it works ==
+
+* Read data from network, unserialize data to Python objects with bencode,
+  and finally, validate the objects with type validator. Data comes as
+  recursive structures of Python primitives consisting from integers,
+  strings, booleans, dictionaries and lists.
+* Use Python's iterators and type system for a compact implementation
+  (the code is just 80 lines with comments)
+* Message format is specified using Python syntax to make type validator
+  intuitive to use
+* It is possible to validate values by specifying a function callback
+  to test a value 
+
+== Documentation ==
+
+Documentation is provided as example Python code ;-) See file "examples.py".
+
+examples.py can be generated into html code by using source-highlight tool.
+
+== Web site ==
+
+http://zakalwe.fi/~shd/foss/typevalidator/
+
+== Git repository ==
+
+git clone git://zakalwe.fi/typevalidator
+
+== Author ==
+
+Heikki Orsila <heikki.orsila@tut.fi>
+
+== Acknowledgements ==
+
+Thanks to Janne Kulmala for the idea of using Python's iterators and
+type system in syntax.
