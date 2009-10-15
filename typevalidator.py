@@ -37,56 +37,73 @@ class Invalid_Format_Object(Exception):
     def __str__(self):
         return self.reason
 
-def validate(fmt, o, demankey=True):
+def validate_list(fmt, o):
+    fmt = list(fmt)
+    o = list(o)
+    while len(fmt) > 0:
+        fitem = fmt.pop(0)
+        if fitem == ZERO_OR_MORE or fitem == ONE_OR_MORE:
+            if len(fmt) == 0:
+                raise Invalid_Format_Object()
+            ftype = fmt.pop(0)
+            if len(o) == 0:
+                if len(fmt) > 0:
+                    continue
+                return fitem == ZERO_OR_MORE
+            while len(o) > 0:
+                if not validate(ftype, o[0]):
+                    if len(fmt) > 0:
+                        break
+                    return False
+                o.pop(0)
+            continue
+        if len(o) == 0:
+            return False
+        oitem = o.pop(0)
+        if not validate(fitem, oitem):
+            return False
+    return len(o) == 0
+
+def validate_dict(fmt, o):
+    for key in fmt.keys():
+        if o.has_key(key) and validate(fmt[key], o[key]):
+            continue
+        t = keytypemap.get(key)
+        if t != None:
+            # STRING_KEY, INT_KEY, ...
+            for okey in o.keys():
+                if type(okey) != t:
+                    # Associate int with long
+                    if t != int or type(okey) != long:
+                        return False
+                if validate(fmt[key], o[okey]) == False:
+                    return False
+        elif isinstance(key, OPTIONAL_KEY):
+            # OPTIONAL_KEY
+            if o.has_key(key.key) and validate(fmt[key], o[key.key]) == False:
+                return False
+        else:
+            return False
+    return True
+
+def validate(fmt, o):
     if fmt == ANY:
         return True
+
+    # Is this a user defined checker function?
     if callable(fmt):
         return fmt(o)
+
     if type(fmt) != type(o):
-        return False
-    if type(fmt) == list:
-        fmt = list(fmt)
-        o = list(o)
-        while len(fmt) > 0:
-            fitem = fmt.pop(0)
-            if fitem == ZERO_OR_MORE or fitem == ONE_OR_MORE:
-                if len(fmt) == 0:
-                    raise Invalid_Format_Object()
-                ftype = fmt.pop(0)
-                if len(o) == 0:
-                    if len(fmt) > 0:
-                        continue
-                    return fitem == ZERO_OR_MORE
-                while len(o) > 0:
-                    if not validate(ftype, o[0]):
-                        if len(fmt) > 0:
-                            break
-                        return False
-                    o.pop(0)
-                continue
-            if len(o) == 0:
-                return False
-            oitem = o.pop(0)
-            if not validate(fitem, oitem):
-                return False
-        if len(o) > 0:
+        # Associate int type with long. We don't use LONG as a validator
+        # keyword, just INT
+        if type(fmt) != int or type(o) != long:
             return False
+
+    if type(fmt) == list:
+        return validate_list(fmt, o)
     elif type(fmt) == dict:
-        for key in fmt.keys():
-            if o.has_key(key) and validate(fmt[key], o[key]):
-                continue
-            t = keytypemap.get(key)
-            if t != None:
-                # STRING_KEY, INT_KEY, ...
-                for okey in o.keys():
-                    if type(okey) != t or validate(fmt[key], o[okey]) == False:
-                        return False
-            elif isinstance(key, OPTIONAL_KEY):
-                # OPTIONAL_KEY
-                if o.has_key(key.key) and validate(fmt[key], o[key.key]) == False:
-                    return False
-            else:
-                return False
+        return validate_dict(fmt, o)
     return True
 
 def test_validate():
@@ -129,6 +146,10 @@ def test_validate():
     assert(validate({OPTIONAL_KEY('x'): INT}, {}))
     assert(validate({OPTIONAL_KEY('x'): INT}, {'x': 1}))
     assert(validate({OPTIONAL_KEY('x'): INT}, {'x': 'invalid'}) == False)
+
+    # Test that int and long are equivalent
+    assert(validate({'x': INT}, {'x': 0L}))
+    assert(validate({INT_KEY: ANY}, {0L: 'x'}))
 
 if __name__ == '__main__':
     test_validate()
