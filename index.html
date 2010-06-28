@@ -13,19 +13,19 @@
   an untrusted source
 <li> It was developed for a P2P application that sends and receives
 <a href="http://en.wikipedia.org/wiki/Bencode">bencoded</a>
-messages from network
-<li> It is recommended that type validator is used with type validator
+messages from network. Message format and type information was validated
+by using the type validator.
 <li> The reference implementation is in public domain (you may do whatever
 you want with the code)
 </ul>
 
 <h2>Motivational background</h2>
 <ul>
-<li> XML is a widely used serialization format but it is somewhat bloated
- for network protocols
-<li> Want a Pythonish approach for network serialization that is
- safe and supports binary data (Python 2.x strings are binary safe)
-<li> Minimize risks and code for validating network messages
+<li> Minimize risks and cleanup code for validating network messages
+<li> Pythonish approach for network serialization
+<li> Supports binary data as strings (Python 2.x strings are binary safe)
+<li> Note: XML schemas are bloated and they do not provide sufficient type
+  information
 </ul>
 
 <h2>How it works</h2>
