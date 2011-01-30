@@ -14,7 +14,11 @@ from types import BooleanType, IntType, LongType, StringType, ListType, TupleTyp
 from typevalidator import validate
 
 def decode_bool(x, f):
-    return (x[f + 1] != '0', f + 2)
+    if x[f + 1] == '0':
+        return (False, f + 2)
+    elif x[f + 1] == '1':
+        return (True, f + 2)
+    raise ValueError
 
 def decode_int(x, f):
     f = f+1
@@ -237,6 +241,11 @@ def test_bdecode():
         pass
     try:
         bdecode('i-03e')
+        assert 0
+    except ValueError:
+        pass
+    try:
+        bdecode('b2')
         assert 0
     except ValueError:
         pass
