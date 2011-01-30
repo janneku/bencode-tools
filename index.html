@@ -9,23 +9,28 @@
 <h1>Type validator</h1>
 
 <ul>
-<li>Type validator is a Python module for validating Python objects from untrusted
-source
+<li>Type validator is a Python module for validating Python objects from
+  an untrusted source
 <li> It was developed for a P2P application that sends and receives
 <a href="http://en.wikipedia.org/wiki/Bencode">bencoded</a>
-messages from network
-<li> It is recommended that type validator is used with type validator
+messages from network. Message format and type information was validated
+by using the type validator.
 <li> The reference implementation is in public domain (you may do whatever
 you want with the code)
 </ul>
 
+<h2>News</h2>
+<ul>
+<li> <font color="red">2010-06-28: <a href="typevalidator-2010-06-28.tar.bz2">New version</a> released</font>
+</ul>
+
 <h2>Motivational background</h2>
 <ul>
-<li> XML is a widely used serialization format but it is somewhat bloated
- for network protocols
-<li> Want a Pythonish approach for network serialization that is
- safe and supports binary data (Python 2.x strings are binary safe)
-<li> Minimize risks and code for validating network messages
+<li> Minimize risks and cleanup code for validating network messages
+<li> Pythonish approach for network serialization
+<li> Supports binary data as strings (Python 2.x strings are binary safe)
+<li> Note: XML schemas are bloated and they do not provide sufficient type
+  information
 </ul>
 
 <h2>How it works</h2>
@@ -46,9 +51,15 @@ you want with the code)
 
 <h2>Download type validator</h2>
 Download latest version of type validator
-<a href="typevalidator-2009-10-09.tar.bz2">here</a>
+<a href="typevalidator-2010-06-28.tar.bz2">here</a>
 or get it from the Git repository: <a href="git://zakalwe.fi/typevalidator">
 git clone git://zakalwe.fi/typevalidator</a>
+
+<p>
+List of releases:
+<ul>
+<li> <a href="typevalidator-2010-06-28.tar.bz2">2010-06-28</a> (<font color="red">newest</font>)
+<li> <a href="typevalidator-2009-10-09.tar.bz2">2009-10-09</a>
 
 <h2>View type validator source code</h2>
 You can view the latest version of type validator source code
@@ -57,14 +68,15 @@ and a BSD licensed bencode <a href="bencode.py">here</a>
 (<a href="LICENSE.bencode">bencode license</a>).
 
 <h2>Examples</h2>
-<!-- Generator: GNU source-highlight 2.4
+
+<!-- Generator: GNU source-highlight 3.1
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt><i><font color="#9A1900"># type validator documentation as a commented source code :-)</font></i>
 
-<b><font color="#000080">from</font></b> bencode<font color="#990000">.</font>py <b><font color="#000080">import</font></b> fmt<font color="#009900">_</font>bdecode
-<b><font color="#000080">from</font></b> typevalidator <b><font color="#000080">import</font></b> validate<font color="#990000">,</font> <font color="#009900">INT</font><font color="#990000">,</font> <font color="#009900">STRING</font><font color="#990000">,</font> <font color="#009900">ONE_OR_MORE</font><font color="#990000">,</font> <font color="#009900">OPTIONAL_KEY</font><font color="#990000">,</font> 
+<b><font color="#000080">from</font></b> bencode<font color="#990000">.</font>py <b><font color="#000080">import</font></b> fmt_bdecode
+<b><font color="#000080">from</font></b> typevalidator <b><font color="#000080">import</font></b> validate<font color="#990000">,</font> ANY<font color="#990000">,</font> ZERO_OR_MORE<font color="#990000">,</font> ONE_OR_MORE<font color="#990000">,</font> OPTIONAL_KEY
 
 <i><font color="#9A1900"># Syntax of validate: validate(specification, object)</font></i>
 <i><font color="#9A1900"># Syntax of fmt_bdecode: fmt_bdecode(specification, blob)</font></i>
@@ -75,56 +87,56 @@ http://www.gnu.org/software/src-highlite -->
 <i><font color="#9A1900"># Asserted examples with type validator:</font></i>
 
 <i><font color="#9A1900"># Demand a dictionary whose keys and values are strings:</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#009900">STRING_KEY</font><font color="#990000">:</font> <font color="#009900">STRING</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'Cheradenine'</font><font color="#990000">})</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#009900">STRING_KEY</font><font color="#990000">:</font> <font color="#009900">STRING</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">1</font><font color="#990000">:</font> <font color="#FF0000">'Cheradenine'</font><font color="#990000">})</font> <font color="#990000">==</font> <font color="#009900">False</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#009900">STRING_KEY</font><font color="#990000">:</font> <font color="#009900">STRING</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">})</font> <font color="#990000">==</font> <font color="#009900">False</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font>str<font color="#990000">:</font> str<font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'Cheradenine'</font><font color="#990000">})</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font>str<font color="#990000">:</font> str<font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">1</font><font color="#990000">:</font> <font color="#FF0000">'Cheradenine'</font><font color="#990000">})</font> <font color="#990000">==</font> False
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font>str<font color="#990000">:</font> str<font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">})</font> <font color="#990000">==</font> False
 
 <i><font color="#9A1900"># Demand a dictionary whose keys are integers but values may have any</font></i>
 <i><font color="#9A1900"># (supported) type. Furthermore, key with value 123 must exist.</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#009900">INT_KEY</font><font color="#990000">:</font> <font color="#009900">ANY</font><font color="#990000">,</font> <font color="#993399">123</font><font color="#990000">:</font> <font color="#009900">ANY</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">123</font><font color="#990000">:</font> <font color="#FF0000">'x'</font><font color="#990000">})</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#009900">INT_KEY</font><font color="#990000">:</font> <font color="#009900">ANY</font><font color="#990000">,</font> <font color="#993399">123</font><font color="#990000">:</font> <font color="#009900">ANY</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">123</font><font color="#990000">:</font> <font color="#993399">456</font><font color="#990000">})</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#009900">INT_KEY</font><font color="#990000">:</font> <font color="#009900">ANY</font><font color="#990000">,</font> <font color="#993399">123</font><font color="#990000">:</font> <font color="#009900">ANY</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">4</font><font color="#990000">:</font> <font color="#FF0000">'x'</font><font color="#990000">})</font> <font color="#990000">==</font> <font color="#009900">False</font> <i><font color="#9A1900"># 123 does not exist</font></i>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font>int<font color="#990000">:</font> ANY<font color="#990000">,</font> <font color="#993399">123</font><font color="#990000">:</font> ANY<font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">123</font><font color="#990000">:</font> <font color="#FF0000">'x'</font><font color="#990000">})</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font>int<font color="#990000">:</font> ANY<font color="#990000">,</font> <font color="#993399">123</font><font color="#990000">:</font> ANY<font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">123</font><font color="#990000">:</font> <font color="#993399">456</font><font color="#990000">})</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font>int<font color="#990000">:</font> ANY<font color="#990000">,</font> <font color="#993399">123</font><font color="#990000">:</font> ANY<font color="#990000">},</font> <font color="#990000">{</font><font color="#993399">4</font><font color="#990000">:</font> <font color="#FF0000">'x'</font><font color="#990000">})</font> <font color="#990000">==</font> False <i><font color="#9A1900"># 123 does not exist</font></i>
 
 <i><font color="#9A1900"># List may begin with ZERO_OR_MORE or ONE_OR_MORE to specify that minimum</font></i>
 <i><font color="#9A1900"># length of the list is either zero or one, respectively. If either is</font></i>
 <i><font color="#9A1900"># used, then also a type must be specified after this.</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">ZERO_OR_MORE</font><font color="#990000">,</font> <font color="#009900">ANY</font><font color="#990000">],</font> <font color="#990000">[])</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">ONE_OR_MORE</font><font color="#990000">,</font> <font color="#009900">ANY</font><font color="#990000">],</font> <font color="#990000">[</font><font color="#FF0000">'x'</font><font color="#990000">])</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">ONE_OR_MORE</font><font color="#990000">,</font> <font color="#009900">ANY</font><font color="#990000">],</font> <font color="#990000">[])</font> <font color="#990000">==</font> <font color="#009900">False</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">ONE_OR_MORE</font><font color="#990000">,</font> <font color="#009900">STRING</font><font color="#990000">],</font> <font color="#990000">[</font><font color="#FF0000">'x'</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">])</font> <font color="#990000">==</font> <font color="#009900">False</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>ZERO_OR_MORE<font color="#990000">,</font> ANY<font color="#990000">],</font> <font color="#990000">[])</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>ONE_OR_MORE<font color="#990000">,</font> ANY<font color="#990000">],</font> <font color="#990000">[</font><font color="#FF0000">'x'</font><font color="#990000">])</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>ONE_OR_MORE<font color="#990000">,</font> ANY<font color="#990000">],</font> <font color="#990000">[])</font> <font color="#990000">==</font> False
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>ONE_OR_MORE<font color="#990000">,</font> str<font color="#990000">],</font> <font color="#990000">[</font><font color="#FF0000">'x'</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">])</font> <font color="#990000">==</font> False
 
 <i><font color="#9A1900"># Recursive data structures are easy to specify! Define a list of</font></i>
 <i><font color="#9A1900"># dictionaries.</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">ZERO_OR_MORE</font><font color="#990000">,</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#009900">STRING</font><font color="#990000">}],</font> <font color="#990000">[{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'User1'</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'User2'</font><font color="#990000">}])</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">ZERO_OR_MORE</font><font color="#990000">,</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#009900">STRING</font><font color="#990000">}],</font> <font color="#990000">[</font><font color="#993399">1</font><font color="#990000">,</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'User1'</font><font color="#990000">}])</font> <font color="#990000">==</font> <font color="#009900">False</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>ZERO_OR_MORE<font color="#990000">,</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> str<font color="#990000">}],</font> <font color="#990000">[{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'User1'</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'User2'</font><font color="#990000">}])</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>ZERO_OR_MORE<font color="#990000">,</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> str<font color="#990000">}],</font> <font color="#990000">[</font><font color="#993399">1</font><font color="#990000">,</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#FF0000">'User1'</font><font color="#990000">}])</font> <font color="#990000">==</font> False
 
 <i><font color="#9A1900"># Define a list that contains one string and one dictionary:</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">STRING</font><font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#FF0000">'foo'</font><font color="#990000">,</font> <font color="#990000">{}])</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">STRING</font><font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#993399">1</font><font color="#990000">,</font> <font color="#990000">{}])</font> <font color="#990000">==</font> <font color="#009900">False</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">STRING</font><font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#FF0000">'foo'</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">])</font> <font color="#990000">==</font> <font color="#009900">False</font>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font><font color="#009900">STRING</font><font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#FF0000">'foo'</font><font color="#990000">,</font> <font color="#990000">{},</font> <font color="#993399">3</font><font color="#990000">])</font> <font color="#990000">==</font> <font color="#009900">False</font> <i><font color="#9A1900"># Too long a list</font></i>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>str<font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#FF0000">'foo'</font><font color="#990000">,</font> <font color="#990000">{}])</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>str<font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#993399">1</font><font color="#990000">,</font> <font color="#990000">{}])</font> <font color="#990000">==</font> False
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>str<font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#FF0000">'foo'</font><font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">])</font> <font color="#990000">==</font> False
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">([</font>str<font color="#990000">,</font> <font color="#990000">{}],</font> <font color="#990000">[</font><font color="#FF0000">'foo'</font><font color="#990000">,</font> <font color="#990000">{},</font> <font color="#993399">3</font><font color="#990000">])</font> <font color="#990000">==</font> False <i><font color="#9A1900"># Too long a list</font></i>
 
 <i><font color="#9A1900"># Extra keys are allowed in the dictionary. Even if only 'x' key is specified,</font></i>
 <i><font color="#9A1900"># other keys are allowed. This was a choice to make message protocols</font></i>
 <i><font color="#9A1900"># extensible.</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#FF0000">'age'</font><font color="#990000">:</font> <font color="#009900">INT</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'age'</font><font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">,</font> <font color="#FF0000">'other'</font><font color="#990000">:</font> <font color="#FF0000">'stuff'</font><font color="#990000">})</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#FF0000">'age'</font><font color="#990000">:</font> int<font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'age'</font><font color="#990000">:</font> <font color="#993399">1</font><font color="#990000">,</font> <font color="#FF0000">'other'</font><font color="#990000">:</font> <font color="#FF0000">'stuff'</font><font color="#990000">})</font>
 
 <i><font color="#9A1900"># Require positive integers by using lambdas</font></i>
-<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#FF0000">'x'</font><font color="#990000">:</font> <b><font color="#0000FF">lambda</font></b> x<font color="#990000">:</font> <b><font color="#000000">type</font></b><font color="#990000">(</font>x<font color="#990000">)</font> <font color="#990000">==</font> int <b><font color="#0000FF">and</font></b> x <font color="#990000">&gt;</font> <font color="#993399">0</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'x'</font><font color="#990000">:</font> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">})</font> <font color="#990000">==</font> <font color="#009900">False</font>
+<b><font color="#0000FF">assert</font></b> <b><font color="#000000">validate</font></b><font color="#990000">({</font><font color="#FF0000">'x'</font><font color="#990000">:</font> <b><font color="#0000FF">lambda</font></b> x<font color="#990000">:</font> <b><font color="#000000">type</font></b><font color="#990000">(</font>x<font color="#990000">)</font> <font color="#990000">==</font> int <b><font color="#0000FF">and</font></b> x <font color="#990000">&gt;</font> <font color="#993399">0</font><font color="#990000">},</font> <font color="#990000">{</font><font color="#FF0000">'x'</font><font color="#990000">:</font> <font color="#990000">-</font><font color="#993399">1</font><font color="#990000">})</font> <font color="#990000">==</font> False
 
 <i><font color="#9A1900"># bencode example</font></i>
 
 blob <font color="#990000">=</font> <b><font color="#000000">read_from_socket</font></b><font color="#990000">()</font>
-<b><font color="#0000FF">if</font></b> blob <font color="#990000">==</font> <font color="#009900">None</font><font color="#990000">:</font>
+<b><font color="#0000FF">if</font></b> blob <font color="#990000">==</font> None<font color="#990000">:</font>
     <b><font color="#0000FF">return</font></b>
-specification <font color="#990000">=</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> <font color="#009900">STRING</font><font color="#990000">,</font>
-                 <b><font color="#000000">OPTIONAL_KEY</font></b><font color="#990000">(</font><font color="#FF0000">'email'</font><font color="#990000">):</font> <font color="#009900">STRING</font><font color="#990000">,</font>
-                 <b><font color="#000000">OPTIONAL_KEY</font></b><font color="#990000">(</font><font color="#FF0000">'age'</font><font color="#990000">):</font> <font color="#009900">INT</font><font color="#990000">,</font>
+specification <font color="#990000">=</font> <font color="#990000">{</font><font color="#FF0000">'name'</font><font color="#990000">:</font> str<font color="#990000">,</font>
+                 <b><font color="#000000">OPTIONAL_KEY</font></b><font color="#990000">(</font><font color="#FF0000">'email'</font><font color="#990000">):</font> str<font color="#990000">,</font>
+                 <b><font color="#000000">OPTIONAL_KEY</font></b><font color="#990000">(</font><font color="#FF0000">'age'</font><font color="#990000">):</font> int<font color="#990000">,</font>
                  <font color="#FF0000">'a-list'</font><font color="#990000">:</font> <font color="#990000">[],</font>
-                 <font color="#FF0000">'non-empty-string-list'</font><font color="#990000">:</font> <font color="#990000">[</font><font color="#009900">ONE_OR_MORE</font><font color="#990000">,</font> <font color="#009900">STRING</font><font color="#990000">],</font>
+                 <font color="#FF0000">'non-empty-string-list'</font><font color="#990000">:</font> <font color="#990000">[</font>ONE_OR_MORE<font color="#990000">,</font> str<font color="#990000">],</font>
                 <font color="#990000">}</font>
 msg <font color="#990000">=</font> <b><font color="#000000">fmt_bdecode</font></b><font color="#990000">(</font>specification<font color="#990000">,</font> blob<font color="#990000">)</font>
-<b><font color="#0000FF">if</font></b> msg <font color="#990000">==</font> <font color="#009900">None</font><font color="#990000">:</font>
+<b><font color="#0000FF">if</font></b> msg <font color="#990000">==</font> None<font color="#990000">:</font>
     <i><font color="#9A1900"># Invalid object</font></i>
     <b><font color="#0000FF">return</font></b>
 
