@@ -56,7 +56,10 @@ def decode_dict(x, f):
     r, f = {}, f+1
     lastkey = None
     while x[f] != 'e':
-        k, f = decode_string(x, f)
+        try:
+            k, f = decode_string(x, f)
+        except ValueError:
+            k, f = decode_int(x, f)
         if lastkey >= k:
             raise ValueError
         lastkey = k
@@ -285,8 +288,12 @@ def bencode_dict(x, b):
     klist = x.keys()
     klist.sort()
     for k in klist:
-        assert type(k) is StringType
-        b.extend((str(len(k)), ':', k))
+        if type(k) is StringType:
+            bencode_string(k, b)
+        elif type(k) is IntType or type(k) is LongType:
+            bencode_int(k, b)
+        else:
+            assert False
         encode_func[type(x[k])](x[k], b)
     b.append('e')
 
