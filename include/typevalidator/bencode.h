@@ -37,4 +37,8 @@ struct bencode {
 	};
 };
 
+struct bencode *ben_decode(const void *data, size_t len);
+
+void ben_free(struct bencode *b);
+
 #endif
