@@ -16,6 +16,11 @@ libtypevalidator.o:	libtypevalidator.c include/typevalidator/bencode.h
 bencodetest:	bencodetest.o libtypevalidator.so
 	$(CC) $(LDFLAGS) -o $@ $< -L. -Wl,-rpath,. -ltypevalidator
 
+check:	bencodetest
+	./bencodetest
+	@echo
+	@echo "All tests successful"
+
 install:	
 	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/typevalidator"
 	install -m 644 include/typevalidator/*.h "$(PREFIX)/include/typevalidator/"
