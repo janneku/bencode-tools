@@ -19,8 +19,6 @@ for opt in "$@" ; do
 		echo "--prefix=dir           Install program to prefix 'dir'"
  		echo "--package-prefix=dest  Pretend to install to the prefix,"
 		echo "                       but copy files to 'dest/prefix' on make install"
-		echo "--uade-prefix=dir      Use dir as uade prefix. libuade.so should be"
-		echo "                       located under dir/lib."
 		exit
 		;;
 	esac
