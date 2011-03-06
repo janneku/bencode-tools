@@ -44,7 +44,7 @@ static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 	char *endptr;
 	size_t pos;
 
-	pos = find(data, len, *off, 'e');
+	pos = find(data, len, *off + 1, 'e');
 	if (pos == -1)
 		return overflow(*off);
 	slen = pos - *off - 1;
@@ -71,8 +71,11 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 static struct bencode *decode(const char *data, size_t len, size_t *off, int l)
 {
 	l++;
-	if (l > 1024)
+	if (l > 256)
 		return NULL;
+	if (*off == len)
+		return NULL;
+	assert (*off < len);
 	switch (data[*off]) {
 	case '0':
 	case '1':
@@ -96,4 +99,18 @@ struct bencode *ben_decode(const void *data, size_t len)
 {
 	size_t off = 0;
 	return decode((const char *) data, len, &off, 0);
+}
+
+struct bencode *ben_decode2(const void *data, size_t len, size_t *off)
+{
+	return decode((const char *) data, len, off, 0);
+}
+
+void ben_free(struct bencode *b)
+{
+	if (b == NULL)
+		return;
+	assert(b->type == BENCODE_INT);
+	b->type = 0;
+	free(b);
 }

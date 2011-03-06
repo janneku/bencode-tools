@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 enum bencodetype {
-	BENCODE_DICT,
+	BENCODE_DICT = 1,
 	BENCODE_INT,
 	BENCODE_LIST,
 	BENCODE_STR,
@@ -38,7 +38,7 @@ struct bencode {
 };
 
 struct bencode *ben_decode(const void *data, size_t len);
-
+struct bencode *ben_decode2(const void *data, size_t len, size_t *off);
 void ben_free(struct bencode *b);
 
 #endif
