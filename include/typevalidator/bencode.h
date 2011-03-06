@@ -14,12 +14,14 @@ struct bencode;
 
 struct bencode_dict {
 	size_t n;
+	size_t alloc;
 	struct bencode **keys;
 	struct bencode **values;
 };
 
 struct bencode_list {
 	size_t n;
+	size_t alloc;
 	struct bencode **values;
 };
 
@@ -33,6 +35,7 @@ struct bencode {
 	union {
 		struct bencode_dict d;
 		long long ll;
+		struct bencode_list l;
 		struct bencode_str s;
 	};
 };

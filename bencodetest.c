@@ -43,6 +43,25 @@ static void strtest(const char *s, size_t len, const char *expected, int success
 	ben_free(b);
 }
 
+static void listtest(const char *s, size_t len, size_t expected, int success)
+{
+	struct bencode *b;
+	b = ben_decode(s, len);
+	if (success && b == NULL) {
+		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
+		exit(1);
+	}
+	if (success && b->l.n != expected) {
+		fprintf(stderr, "%s/%zd should have %zu entries\n", s, len, expected);
+		exit(1);
+	}
+	if (!success && b != NULL) {
+		fprintf(stderr, "%s/%zd should have failed\n", s, len);
+		exit(1);
+	}
+	ben_free(b);
+}
+
 int main(void)
 {
 	inttest("i-1e", 4, -1, 1);
@@ -56,5 +75,14 @@ int main(void)
 	strtest("7:marklar", 9, "marklar", 1);
 	strtest("7:marklar", 8, "marklar", 0);
 
+	listtest("le", 2, 0, 1);
+	listtest("li0ee", 5, 1, 1);
+	listtest("li0ei0ee", 8, 2, 1);
+	listtest("li0ei0ei0ee", 11, 3, 1);
+	listtest("li0ei0ei0ei0ee", 14, 4, 1);
+	listtest("li0ei0ei0ei0ei0ee", 17, 5, 1);
+	listtest("l7:marklare", 11, 1, 1);
+	listtest("l7:marklari0ee", 14, 2, 1);
+	listtest("l7:marklarf", 11, 1, 0);
 	return 0;
 }
