@@ -1,0 +1,25 @@
+AR = {AR}
+CC = {CC}
+CFLAGS = -Wall -O2 -g -fPIC -shared -Iinclude {CFLAGS}
+LDFLAGS = {LDFLAGS}
+PREFIX = {PREFIX}
+
+MODULES = libtypevalidator.o
+
+all:	libtypevalidator.so
+
+libtypevalidator.so:	$(MODULES)
+	$(AR) rcs $@ $(MODULES)
+
+libtypevalidator.o:	libtypevalidator.c include/typevalidator/bencode.h
+
+install:	
+	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/typevalidator"
+	install -m 644 include/typevalidator/*.h "$(PREFIX)/include/typevalidator/"
+	install -m 644 libtypevalidator.so "$(PREFIX)/lib/"
+
+%.o:	%.c
+	$(CC) $(CFLAGS) -c $<
+
+clean:	
+	rm -f *.o *.so
