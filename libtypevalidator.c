@@ -38,6 +38,34 @@ static struct bencode *invalid(const char *reason, size_t off)
 	return NULL;
 }
 
+static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
+{
+	struct bencode *b;
+	int value;
+	if ((*off + 2) > len)
+		return invalid("Too short a data for bool", *off);
+
+	switch (data[*off + 1]) {
+	case '0':
+		value = 0;
+		break;
+	case '1':
+		value = 1;
+		break;
+	default:
+		return invalid("Invalid bool value", *off);
+	}
+
+	b = alloc(BENCODE_BOOL);
+	if (b == NULL) {
+		fprintf(stderr, "bencode: No memory for bool\n");
+		return NULL;
+	}
+	b->b = value;
+	*off += 2;
+	return b;
+}
+
 static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 {
 	/* fits all 64 bit integers */
@@ -221,6 +249,8 @@ static struct bencode *decode(const char *data, size_t len, size_t *off, int l)
 	case '8':
 	case '9':
 		return decode_str(data, len, off);
+	case 'b':
+		return decode_bool(data, len, off);
 	case 'i':
 		return decode_int(data, len, off);
 	case 'l':
@@ -248,8 +278,6 @@ static void free_list(struct bencode_list *list)
 		ben_free(list->values[pos]);
 		list->values[pos] = NULL;
 	}
-	list->n = 0;
-	list->alloc = 0;
 }
 
 void ben_free(struct bencode *b)
@@ -257,6 +285,7 @@ void ben_free(struct bencode *b)
 	if (b == NULL)
 		return;
 	switch (b->type) {
+	case BENCODE_BOOL:
 	case BENCODE_INT:
 		break;
 	case BENCODE_LIST:
@@ -264,13 +293,11 @@ void ben_free(struct bencode *b)
 		break;
 	case BENCODE_STR:
 		free(b->s.s);
-		b->s.s = NULL;
-		b->s.len = 0;
 		break;
 	default:
 		fprintf(stderr, "bencode: invalid type: %d\n", b->type);
 		exit(1);
 	}
-	b->type = 0;
+	memset(b, -1, sizeof *b); /* data poison */
 	free(b);
 }

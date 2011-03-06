@@ -4,7 +4,8 @@
 #include <stdio.h>
 
 enum bencodetype {
-	BENCODE_DICT = 1,
+	BENCODE_BOOL = 1,
+	BENCODE_DICT,
 	BENCODE_INT,
 	BENCODE_LIST,
 	BENCODE_STR,
@@ -33,10 +34,11 @@ struct bencode_str {
 struct bencode {
 	enum bencodetype type;
 	union {
-		struct bencode_dict d;
-		long long ll;
-		struct bencode_list l;
-		struct bencode_str s;
+		int b;                 /* bool */
+		struct bencode_dict d; /* dict */
+		long long ll;          /* int */
+		struct bencode_list l; /* list */
+		struct bencode_str s;  /* str */
 	};
 };
 

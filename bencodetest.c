@@ -5,6 +5,25 @@
 #include <stdio.h>
 #include <string.h>
 
+static void booltest(const char *s, size_t len, int expected, int success)
+{
+	struct bencode *b;
+	b = ben_decode(s, len);
+	if (success && b == NULL) {
+		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
+		exit(1);
+	}
+	if (success && b->b != expected) {
+		fprintf(stderr, "%s/%zd should have value %d\n", s, len, expected);
+		exit(1);
+	}
+	if (!success && b != NULL) {
+		fprintf(stderr, "%s/%zd should have failed\n", s, len);
+		exit(1);
+	}
+	ben_free(b);
+}
+
 static void inttest(const char *s, size_t len, long long expected, int success)
 {
 	struct bencode *b;
@@ -64,6 +83,11 @@ static void listtest(const char *s, size_t len, size_t expected, int success)
 
 int main(void)
 {
+	booltest("b0", 1, 0, 0);
+	booltest("b0", 2, 0, 1);
+	booltest("b1", 2, 1, 1);
+	booltest("b2", 2, 1, 0);
+
 	inttest("i-1e", 4, -1, 1);
 	inttest("i-1e", 3, -1, 0);
 	inttest("i0e", 3, 0, 1);
@@ -84,5 +108,6 @@ int main(void)
 	listtest("l7:marklare", 11, 1, 1);
 	listtest("l7:marklari0ee", 14, 2, 1);
 	listtest("l7:marklarf", 11, 1, 0);
+
 	return 0;
 }
