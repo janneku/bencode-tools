@@ -13,7 +13,7 @@ libtypevalidator.so:	$(LIBMODULES)
 
 libtypevalidator.o:	libtypevalidator.c include/typevalidator/bencode.h
 
-bencodetest:	bencodetest.o
+bencodetest:	bencodetest.o libtypevalidator.so
 	$(CC) $(LDFLAGS) -o $@ $< -L. -Wl,-rpath,. -ltypevalidator
 
 install:	
