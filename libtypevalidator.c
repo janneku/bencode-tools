@@ -26,12 +26,6 @@ static struct bencode *alloc(enum bencodetype type)
 	return b;
 }
 
-static struct bencode *overflow(size_t off)
-{
-	fprintf(stderr, "bencode: overflow at position %zu\n", off);
-	return NULL;
-}
-
 static struct bencode *invalid(const char *reason, size_t off)
 {
 	fprintf(stderr, "bencode: %s: invalid data at position %zu\n", reason, off);
@@ -42,20 +36,13 @@ static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 {
 	struct bencode *b;
 	int value;
+	char c;
 	if ((*off + 2) > len)
 		return invalid("Too short a data for bool", *off);
-
-	switch (data[*off + 1]) {
-	case '0':
-		value = 0;
-		break;
-	case '1':
-		value = 1;
-		break;
-	default:
+	c = data[*off + 1];
+	if (c != '0' && c != '1')
 		return invalid("Invalid bool value", *off);
-	}
-
+	value = (c == '1');
 	b = alloc(BENCODE_BOOL);
 	if (b == NULL) {
 		fprintf(stderr, "bencode: No memory for bool\n");
@@ -66,36 +53,54 @@ static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 	return b;
 }
 
+static struct bencode *decode_dict(const char *data, size_t len, size_t *off)
+{
+	assert(0);
+}
+
+/* off is the position of first number in */
+static int read_long_long(long long *ll, const char *data, size_t len,
+			  size_t *off, int c)
+{
+	char buf[21]; /* fits all 64 bit integers */
+	size_t pos;
+	char *endptr;
+	size_t slen;
+
+	pos = find(data, len, *off, c);
+	if (pos == -1)
+		return -1;
+	slen = pos - *off;
+	if (slen == 0 || slen >= sizeof buf)
+		return -1;
+	assert(slen < sizeof buf);
+	memcpy(buf, data + *off, slen);
+	buf[slen] = 0;
+
+	errno = 0;
+	*ll = strtoll(buf, &endptr, 10);
+	if (errno == ERANGE || *endptr != 0)
+		return -1;
+
+	*off = pos + 1;
+
+	return 0;
+}
+
 static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 {
-	/* fits all 64 bit integers */
-	char buf[21];
-	size_t slen;
 	struct bencode *b;
-	char *endptr;
-	size_t pos;
 	long long ll;
-
-	pos = find(data, len, *off + 1, 'e');
-	if (pos == -1)
-		return overflow(*off);
-	slen = pos - *off - 1;
-	if (slen == 0 || slen >= sizeof buf)
-		return invalid("bad int slen", *off);
-	assert(slen < sizeof buf);
-	memcpy(buf, data + *off + 1, slen);
-	buf[slen] = 0;
-	errno = 0;
-	ll = strtoll(buf, &endptr, 10);
-	if (errno == ERANGE || *endptr != 0)
-		return invalid("bad int string", *off);
+	size_t newoff = *off + 1;
+	if (read_long_long(&ll, data, len, &newoff, 'e'))
+		return invalid("bad integer value", *off);
 	b = alloc(BENCODE_INT);
 	if (b == NULL) {
 		fprintf(stderr, "bencode: No memory for int\n");
 		return NULL;
 	}
 	b->ll = ll;
-	*off = pos + 1;
+	*off = newoff;
 	return b;
 }
 
@@ -163,52 +168,40 @@ error:
 	return NULL;
 }
 
-static size_t read_size_t(const char *buf)
+static size_t read_size_t(const char *data, size_t len, size_t *off, int c)
 {
-	char *endptr;
 	long long ll;
 	size_t s;
-
-	errno = 0;
-	/* Note: value equal to ((size_t) -1) is not valid */
-	ll = strtoll(buf, &endptr, 10);
-	if (errno == ERANGE || *endptr != 0)
+	size_t newoff = *off;
+	if (read_long_long(&ll, data, len, &newoff, c))
 		return -1;
 	if (ll < 0)
 		return -1;
+	/*
+	 * Test that information is not lost when converting from long long
+	 * to size_t
+	 */
 	s = (size_t) ll;
 	if (ll != (long long) s)
 		return -1;
+
+	*off = newoff;
 	return s;
 }
 
 static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 {
-	char buf[21];
-	size_t pos;
-	size_t slen;
 	size_t datalen;
 	struct bencode *b;
-	size_t newoff;
-
-	pos = find(data, len, *off + 1, ':');
-	if (pos == -1)
-		return overflow(*off);
-	slen = pos - *off;
-	if (slen == 0 || slen >= sizeof buf)
-		return invalid("no string length", *off);
-	assert(slen < sizeof buf);
-	memcpy(buf, data + *off, slen);
-	buf[slen] = 0;
+	size_t newoff = *off;
 
 	/* Read the string length */
-	datalen = read_size_t(buf);
+	datalen = read_size_t(data, len, &newoff, ':');
 	if (datalen == -1)
 		return invalid("invalid string length", *off);
 
-	newoff = pos + 1 + datalen;
-	if (newoff > len)
-		return invalid("too long a string (data out of bounds)", *off);
+	if ((newoff + datalen) > len)
+		return invalid("string out of bounds", *off);
 
 	/* Allocate string structure and copy data into it */
 	b = alloc(BENCODE_STR);
@@ -222,10 +215,10 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 		fprintf(stderr, "bencode: No memory for string\n");
 		return NULL;
 	}
-	memcpy(b->s.s, data + pos + 1, datalen);
+	memcpy(b->s.s, data + newoff, datalen);
 	b->s.len = datalen;
 
-	*off = newoff;
+	*off = newoff + datalen;
 	return b;
 }
 
@@ -251,6 +244,8 @@ static struct bencode *decode(const char *data, size_t len, size_t *off, int l)
 		return decode_str(data, len, off);
 	case 'b':
 		return decode_bool(data, len, off);
+	case 'd':
+		return decode_dict(data, len, off);
 	case 'i':
 		return decode_int(data, len, off);
 	case 'l':
@@ -271,6 +266,12 @@ struct bencode *ben_decode2(const void *data, size_t len, size_t *off)
 	return decode((const char *) data, len, off, 0);
 }
 
+static void free_dict(struct bencode_dict *dict)
+{
+	dict = dict;
+	assert(0);
+}
+
 static void free_list(struct bencode_list *list)
 {
 	size_t pos;
@@ -286,6 +287,10 @@ void ben_free(struct bencode *b)
 		return;
 	switch (b->type) {
 	case BENCODE_BOOL:
+		break;
+	case BENCODE_DICT:
+		free_dict(&b->d);
+		break;
 	case BENCODE_INT:
 		break;
 	case BENCODE_LIST:
