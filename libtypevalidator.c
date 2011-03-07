@@ -97,7 +97,7 @@ static int resize_dict(struct bencode_dict *d)
 }
 
 static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
-	int level)
+				   int level)
 {
 	struct bencode *key;
 	struct bencode *value;
