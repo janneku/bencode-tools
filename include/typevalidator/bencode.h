@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-enum bencodetype {
+enum {
 	BENCODE_BOOL = 1,
 	BENCODE_DICT,
 	BENCODE_INT,
@@ -13,33 +13,39 @@ enum bencodetype {
 
 struct bencode;
 
+struct bencode_bool {
+	char type;
+	char b;
+};
+
 struct bencode_dict {
+	char type;
 	size_t n;
 	size_t alloc;
 	struct bencode **keys;
 	struct bencode **values;
 };
 
+struct bencode_int {
+	char type;
+	long long ll;
+};
+
 struct bencode_list {
+	char type;
 	size_t n;
 	size_t alloc;
 	struct bencode **values;
 };
 
 struct bencode_str {
+	char type;
 	size_t len;
 	char *s;
 };
 
 struct bencode {
-	enum bencodetype type;
-	union {
-		int b;                 /* bool */
-		struct bencode_dict d; /* dict */
-		long long ll;          /* int */
-		struct bencode_list l; /* list */
-		struct bencode_str s;  /* str */
-	};
+	char type;
 };
 
 struct bencode *ben_decode(const void *data, size_t len);

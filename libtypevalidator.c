@@ -17,9 +17,31 @@ static size_t find(const char *data, size_t len, size_t off, char c)
 	return -1;
 }
 
-static struct bencode *alloc(enum bencodetype type)
+static void *alloc(int type)
 {
-	struct bencode *b = calloc(1, sizeof *b);
+	struct bencode *b;
+	size_t size;
+	switch (type) {
+	case BENCODE_BOOL:
+		size = sizeof(struct bencode_bool);
+		break;
+	case BENCODE_DICT:
+		size = sizeof(struct bencode_dict);
+		break;
+	case BENCODE_INT:
+		size = sizeof(struct bencode_int);
+		break;
+	case BENCODE_LIST:
+		size = sizeof(struct bencode_list);
+		break;
+	case BENCODE_STR:
+		size = sizeof(struct bencode_str);
+		break;
+	default:
+		fprintf(stderr, "Unknown bencode type: %d\n", type);
+		exit(1);
+	}
+	b = calloc(1, size);
 	if (b == NULL)
 		return NULL;
 	b->type = type;
@@ -34,8 +56,8 @@ static struct bencode *invalid(const char *reason, size_t off)
 
 static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 {
-	struct bencode *b;
-	int value;
+	struct bencode_bool *b;
+	char value;
 	char c;
 	if ((*off + 2) > len)
 		return invalid("Too short a data for bool", *off);
@@ -50,7 +72,7 @@ static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 	}
 	b->b = value;
 	*off += 2;
-	return b;
+	return (struct bencode *) b;
 }
 
 static struct bencode *decode_dict(const char *data, size_t len, size_t *off)
@@ -89,7 +111,7 @@ static int read_long_long(long long *ll, const char *data, size_t len,
 
 static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 {
-	struct bencode *b;
+	struct bencode_int *b;
 	long long ll;
 	size_t newoff = *off + 1;
 	if (read_long_long(&ll, data, len, &newoff, 'e'))
@@ -101,7 +123,7 @@ static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 	}
 	b->ll = ll;
 	*off = newoff;
-	return b;
+	return (struct bencode *) b;
 }
 
 static int resize_list(struct bencode_list *list)
@@ -123,7 +145,7 @@ static int resize_list(struct bencode_list *list)
 
 static struct bencode *decode_list(const char *data, size_t len, size_t *off, int level)
 {
-	struct bencode *l;
+	struct bencode_list *l;
 	size_t oldoff = *off;
 
 	l = alloc(BENCODE_LIST);
@@ -132,9 +154,9 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off, in
 		return NULL;
 	}
 
-	l->l.alloc = 4;
-	l->l.values = malloc(sizeof(l->l.values[0]) * l->l.alloc);
-	if (l->l.values == NULL) {
+	l->alloc = 4;
+	l->values = malloc(sizeof(l->values[0]) * l->alloc);
+	if (l->values == NULL) {
 		fprintf(stderr, "bencode: No memory for list values\n");
 		goto error;
 	}
@@ -143,15 +165,15 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off, in
 
 	while (*off < len && data[*off] != 'e') {
 		struct bencode *b;
-		if (l->l.n == l->l.alloc && resize_list(&l->l)) {
+		if (l->n == l->alloc && resize_list(l)) {
 			fprintf(stderr, "bencode: Can not resize list: %zu\n", oldoff);
 			goto error;
 		}
 		b = decode(data, len, off, level);
 		if (b == NULL)
 			goto error;
-		l->l.values[l->l.n] = b;
-		l->l.n += 1;
+		l->values[l->n] = b;
+		l->n += 1;
 	}
 
 	if (*off >= len) {
@@ -161,10 +183,10 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off, in
 
 	*off += 1;
 
-	return l;
+	return (struct bencode *) l;
 
 error:
-	ben_free(l);
+	ben_free((struct bencode *) l);
 	return NULL;
 }
 
@@ -192,7 +214,7 @@ static size_t read_size_t(const char *data, size_t len, size_t *off, int c)
 static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 {
 	size_t datalen;
-	struct bencode *b;
+	struct bencode_str *b;
 	size_t newoff = *off;
 
 	/* Read the string length */
@@ -208,18 +230,18 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 	if (b == NULL) {
 		fprintf(stderr, "bencode: No memory for str structure\n");
 		return NULL;
-	}	
-	b->s.s = malloc(datalen);
-	if (b->s.s == NULL) {
+	}
+	b->s = malloc(datalen);
+	if (b->s == NULL) {
 		free(b);
 		fprintf(stderr, "bencode: No memory for string\n");
 		return NULL;
 	}
-	memcpy(b->s.s, data + newoff, datalen);
-	b->s.len = datalen;
+	memcpy(b->s, data + newoff, datalen);
+	b->len = datalen;
 
 	*off = newoff + datalen;
-	return b;
+	return (struct bencode *) b;
 }
 
 static struct bencode *decode(const char *data, size_t len, size_t *off, int l)
@@ -289,15 +311,15 @@ void ben_free(struct bencode *b)
 	case BENCODE_BOOL:
 		break;
 	case BENCODE_DICT:
-		free_dict(&b->d);
+		free_dict((struct bencode_dict *) b);
 		break;
 	case BENCODE_INT:
 		break;
 	case BENCODE_LIST:
-		free_list(&b->l);
+		free_list((struct bencode_list *) b);
 		break;
 	case BENCODE_STR:
-		free(b->s.s);
+		free(((struct bencode_str *) b)->s);
 		break;
 	default:
 		fprintf(stderr, "bencode: invalid type: %d\n", b->type);

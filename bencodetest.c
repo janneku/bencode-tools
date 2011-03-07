@@ -7,8 +7,8 @@
 
 static void booltest(const char *s, size_t len, int expected, int success)
 {
-	struct bencode *b;
-	b = ben_decode(s, len);
+	struct bencode_bool *b;
+	b = (struct bencode_bool *) ben_decode(s, len);
 	if (success && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
@@ -21,13 +21,13 @@ static void booltest(const char *s, size_t len, int expected, int success)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
-	ben_free(b);
+	ben_free((struct bencode *) b);
 }
 
 static void inttest(const char *s, size_t len, long long expected, int success)
 {
-	struct bencode *b;
-	b = ben_decode(s, len);
+	struct bencode_int *b;
+	b = (struct bencode_int *) ben_decode(s, len);
 	if (success && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
@@ -40,18 +40,18 @@ static void inttest(const char *s, size_t len, long long expected, int success)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
-	ben_free(b);
+	ben_free((struct bencode *) b);
 }
 
 static void strtest(const char *s, size_t len, const char *expected, int success)
 {
-	struct bencode *b;
-	b = ben_decode(s, len);
+	struct bencode_str *b;
+	b = (struct bencode_str *) ben_decode(s, len);
 	if (success && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && strcmp(b->s.s, expected) != 0) {
+	if (success && memcmp(b->s, expected, strlen(expected)) != 0) {
 		fprintf(stderr, "%s/%zd should have value %s\n", s, len, expected);
 		exit(1);
 	}
@@ -59,18 +59,18 @@ static void strtest(const char *s, size_t len, const char *expected, int success
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
-	ben_free(b);
+	ben_free((struct bencode *) b);
 }
 
 static void listtest(const char *s, size_t len, size_t expected, int success)
 {
-	struct bencode *b;
-	b = ben_decode(s, len);
+	struct bencode_list *b;
+	b = (struct bencode_list *) ben_decode(s, len);
 	if (success && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && b->l.n != expected) {
+	if (success && b->n != expected) {
 		fprintf(stderr, "%s/%zd should have %zu entries\n", s, len, expected);
 		exit(1);
 	}
@@ -78,7 +78,7 @@ static void listtest(const char *s, size_t len, size_t expected, int success)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
-	ben_free(b);
+	ben_free((struct bencode *) b);
 }
 
 int main(void)
