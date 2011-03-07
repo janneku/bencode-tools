@@ -9,7 +9,7 @@ LIBMODULES = libtypevalidator.o
 all:	libtypevalidator.so bencodetest
 
 libtypevalidator.so:	$(LIBMODULES)
-	$(AR) rcs $@ $(LIBMODULES)
+	$(CC) -shared -Wl,-soname,libtypevalidator.so -o libtypevalidator.so $(LIBMODULES)
 
 libtypevalidator.o:	libtypevalidator.c include/typevalidator/bencode.h
 
