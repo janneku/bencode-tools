@@ -18,31 +18,29 @@ static size_t find(const char *data, size_t len, size_t off, char c)
 	return -1;
 }
 
-static void *alloc(int type)
+static size_t type_size(int type)
 {
-	struct bencode *b;
-	size_t size;
 	switch (type) {
 	case BENCODE_BOOL:
-		size = sizeof(struct bencode_bool);
-		break;
+		return sizeof(struct bencode_bool);
 	case BENCODE_DICT:
-		size = sizeof(struct bencode_dict);
-		break;
+		return sizeof(struct bencode_dict);
 	case BENCODE_INT:
-		size = sizeof(struct bencode_int);
-		break;
+		return sizeof(struct bencode_int);
 	case BENCODE_LIST:
-		size = sizeof(struct bencode_list);
-		break;
+		return sizeof(struct bencode_list);
 	case BENCODE_STR:
-		size = sizeof(struct bencode_str);
-		break;
+		return sizeof(struct bencode_str);
 	default:
 		fprintf(stderr, "Unknown bencode type: %d\n", type);
 		exit(1);
 	}
-	b = calloc(1, size);
+	return 0;
+}
+
+static void *alloc(int type)
+{
+	struct bencode *b = calloc(1, type_size(type));
 	if (b == NULL)
 		return NULL;
 	b->type = type;
@@ -412,6 +410,7 @@ void ben_free(struct bencode *b)
 		fprintf(stderr, "bencode: invalid type: %d\n", b->type);
 		exit(1);
 	}
-	memset(b, -1, sizeof *b); /* data poison */
+
+	memset(b, -1, type_size(b->type)); /* data poison */
 	free(b);
 }
