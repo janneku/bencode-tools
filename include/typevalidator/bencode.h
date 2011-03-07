@@ -51,13 +51,22 @@ struct bencode {
 
 struct bencode *ben_decode(const void *data, size_t len);
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off);
+void *ben_encode(size_t *len, const struct bencode *b);
 void ben_free(struct bencode *b);
 
 struct bencode *ben_blob(const void *data, size_t len);
 struct bencode *ben_bool(int b);
 struct bencode *ben_dict(void);
 struct bencode *ben_int(long long ll);
+
 struct bencode *ben_list(void);
+int ben_list_append(struct bencode *list, struct bencode *b);
+static struct bencode_list *ben_list_cast(struct bencode *list)
+{
+	return list->type == BENCODE_LIST ? ((struct bencode_list *) list) : NULL;
+}
+
 struct bencode *ben_str(const char *s);
+
 
 #endif

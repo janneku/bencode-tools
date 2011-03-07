@@ -235,15 +235,11 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off,
 
 	while (newoff < len && data[newoff] != 'e') {
 		struct bencode *b;
-		if (l->n == l->alloc && resize_list(l)) {
-			fprintf(stderr, "bencode: Can not resize list: %zu\n", *off);
-			goto error;
-		}
 		b = decode(data, len, &newoff, level);
 		if (b == NULL)
 			goto error;
-		l->values[l->n] = b;
-		l->n += 1;
+		if (ben_list_append((struct bencode *) l, b))
+			goto error;
 	}
 
 	if (newoff >= len) {
@@ -445,6 +441,18 @@ struct bencode *ben_int(long long ll)
 struct bencode *ben_list(void)
 {
 	return alloc(BENCODE_LIST);
+}
+
+int ben_list_append(struct bencode *list, struct bencode *b)
+{
+	struct bencode_list *l = ben_list_cast(list);
+	/* NULL pointer de-reference if the cast fails */
+	assert(l->n <= l->alloc);
+	if (l->n == l->alloc && resize_list(l))
+		return -1;
+	l->values[l->n] = b;
+	l->n += 1;
+	return 0;
 }
 
 struct bencode *ben_str(const char *s)
