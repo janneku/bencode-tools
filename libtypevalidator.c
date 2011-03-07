@@ -6,7 +6,8 @@
 #include <assert.h>
 #include <errno.h>
 
-static struct bencode *decode(const char *data, size_t len, size_t *off, int l);
+static struct bencode *decode(const char *data, size_t len, size_t *off,
+			      int level);
 
 static size_t find(const char *data, size_t len, size_t off, char c)
 {
@@ -75,9 +76,90 @@ static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 	return (struct bencode *) b;
 }
 
-static struct bencode *decode_dict(const char *data, size_t len, size_t *off)
+static int resize_dict(struct bencode_dict *d)
 {
-	assert(0);
+	struct bencode **newkeys;
+	struct bencode **newvalues;
+	size_t newsize;
+	size_t maxalloc = ((size_t) -1) / sizeof(d->keys[0]) / 2;
+
+	if (d->alloc >= maxalloc)
+		return -1;
+
+	d->alloc *= 2;
+	newsize = sizeof(d->values[0]) * d->alloc;
+
+	newkeys = realloc(d->keys, newsize);
+	newvalues = realloc(d->values, newsize);
+	if (newkeys == NULL || newvalues == NULL)
+		return -1;
+	d->keys = newkeys;
+	d->values = newvalues;
+	return 0;
+}
+
+static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
+	int level)
+{
+	struct bencode *key;
+	struct bencode *value;
+	size_t newoff = *off + 1;
+	struct bencode_dict *d;
+
+	d = alloc(BENCODE_DICT);
+	if (d == NULL) {
+		fprintf(stderr, "bencode: Not enough memory for dict\n");
+		return NULL;
+	}
+
+	d->alloc = 4;
+	d->keys = malloc(sizeof(d->keys[0]) * d->alloc);
+	d->values = malloc(sizeof(d->values[0]) * d->alloc);
+	if (d->keys == NULL || d->values == NULL) {
+		free(d->keys);
+		d->keys = NULL;
+		free(d->values);
+		d->values = NULL;
+		fprintf(stderr, "bencode: No memory for dict keys/values\n");
+		goto error;
+	}
+
+	while (newoff < len && data[newoff] != 'e') {
+		if (d->n == d->alloc && resize_dict(d)) {
+			fprintf(stderr, "bencode: Can not resize dict\n");
+			goto error;
+		}
+		key = decode(data, len, &newoff, level);
+		if (key == NULL)
+			goto error;
+		if (key->type != BENCODE_INT && key->type != BENCODE_STR) {
+			ben_free(key);
+			key = NULL;
+			fprintf(stderr, "bencode: Invalid dict key type\n");
+			goto error;
+		}
+		value = decode(data, len, &newoff, level);
+		if (value == NULL) {
+			ben_free(key);
+			key = NULL;
+			goto error;
+		}
+		d->keys[d->n] = key;
+		d->values[d->n] = value;
+		d->n++;
+	}
+	if (newoff >= len) {
+		fprintf(stderr, "bencode: Dict not terminated: %zu\n", *off);
+		goto error;
+	}
+
+	*off = newoff + 1;
+
+	return (struct bencode *) d;
+
+error:
+	ben_free((struct bencode *) d);
+	return NULL;
 }
 
 /* off is the position of first number in */
@@ -143,10 +225,11 @@ static int resize_list(struct bencode_list *list)
 	return 0;
 }
 
-static struct bencode *decode_list(const char *data, size_t len, size_t *off, int level)
+static struct bencode *decode_list(const char *data, size_t len, size_t *off,
+				   int level)
 {
 	struct bencode_list *l;
-	size_t oldoff = *off;
+	size_t newoff = *off + 1;
 
 	l = alloc(BENCODE_LIST);
 	if (l == NULL) {
@@ -161,27 +244,25 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off, in
 		goto error;
 	}
 
-	*off += 1;
-
-	while (*off < len && data[*off] != 'e') {
+	while (newoff < len && data[newoff] != 'e') {
 		struct bencode *b;
 		if (l->n == l->alloc && resize_list(l)) {
-			fprintf(stderr, "bencode: Can not resize list: %zu\n", oldoff);
+			fprintf(stderr, "bencode: Can not resize list: %zu\n", *off);
 			goto error;
 		}
-		b = decode(data, len, off, level);
+		b = decode(data, len, &newoff, level);
 		if (b == NULL)
 			goto error;
 		l->values[l->n] = b;
 		l->n += 1;
 	}
 
-	if (*off >= len) {
-		fprintf(stderr, "bencode: List not terminated: %zu\n", oldoff);
+	if (newoff >= len) {
+		fprintf(stderr, "bencode: List not terminated: %zu\n", *off);
 		goto error;
 	}
 
-	*off += 1;
+	*off = newoff + 1;
 
 	return (struct bencode *) l;
 
@@ -244,10 +325,11 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 	return (struct bencode *) b;
 }
 
-static struct bencode *decode(const char *data, size_t len, size_t *off, int l)
+static struct bencode *decode(const char *data, size_t len, size_t *off,
+			      int level)
 {
-	l++;
-	if (l > 256)
+	level++;
+	if (level > 256)
 		return NULL;
 	if (*off == len)
 		return NULL;
@@ -267,11 +349,11 @@ static struct bencode *decode(const char *data, size_t len, size_t *off, int l)
 	case 'b':
 		return decode_bool(data, len, off);
 	case 'd':
-		return decode_dict(data, len, off);
+		return decode_dict(data, len, off, level);
 	case 'i':
 		return decode_int(data, len, off);
 	case 'l':
-		return decode_list(data, len, off, l);
+		return decode_list(data, len, off, level);
 	default:
 		return invalid("unknown bencode type", *off);
 	}
@@ -288,10 +370,15 @@ struct bencode *ben_decode2(const void *data, size_t len, size_t *off)
 	return decode((const char *) data, len, off, 0);
 }
 
-static void free_dict(struct bencode_dict *dict)
+static void free_dict(struct bencode_dict *d)
 {
-	dict = dict;
-	assert(0);
+	size_t pos;
+	for (pos = 0; pos < d->n; pos++) {
+		ben_free(d->keys[pos]);
+		d->keys[pos] = NULL;
+		ben_free(d->values[pos]);
+		d->values[pos] = NULL;
+	}
 }
 
 static void free_list(struct bencode_list *list)

@@ -22,6 +22,7 @@ struct bencode_dict {
 	char type;
 	size_t n;
 	size_t alloc;
+	/* keys and values can be put into a same array, later */
 	struct bencode **keys;
 	struct bencode **values;
 };

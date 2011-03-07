@@ -81,6 +81,25 @@ static void listtest(const char *s, size_t len, size_t expected, int success)
 	ben_free((struct bencode *) b);
 }
 
+static void dicttest(const char *s, size_t len, size_t expected, int success)
+{
+	struct bencode_dict *b;
+	b = (struct bencode_dict *) ben_decode(s, len);
+	if (success && b == NULL) {
+		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
+		exit(1);
+	}
+	if (success && b->n != expected) {
+		fprintf(stderr, "%s/%zd should have %zu entries\n", s, len, expected);
+		exit(1);
+	}
+	if (!success && b != NULL) {
+		fprintf(stderr, "%s/%zd should have failed\n", s, len);
+		exit(1);
+	}
+	ben_free((struct bencode *) b);
+}
+
 int main(void)
 {
 	booltest("b0", 1, 0, 0);
@@ -108,6 +127,11 @@ int main(void)
 	listtest("l7:marklare", 11, 1, 1);
 	listtest("l7:marklari0ee", 14, 2, 1);
 	listtest("l7:marklarf", 11, 1, 0);
+
+	dicttest("di0e7:marklare", 14, 1, 1);
+	dicttest("di0e7:marklare", 13, 1, 0);
+	dicttest("di0e7:marklari0e7:marklare", 26, 2, 1);
+	dicttest("de", 2, 0, 1);
 
 	return 0;
 }
