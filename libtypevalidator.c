@@ -65,10 +65,8 @@ static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 		return invalid("Invalid bool value", *off);
 	value = (c == '1');
 	b = alloc(BENCODE_BOOL);
-	if (b == NULL) {
-		fprintf(stderr, "bencode: No memory for bool\n");
+	if (b == NULL)
 		return NULL;
-	}
 	b->b = value;
 	*off += 2;
 	return (struct bencode *) b;
@@ -118,7 +116,6 @@ static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 		d->keys = NULL;
 		free(d->values);
 		d->values = NULL;
-		fprintf(stderr, "bencode: No memory for dict keys/values\n");
 		goto error;
 	}
 
@@ -197,10 +194,8 @@ static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 	if (read_long_long(&ll, data, len, &newoff, 'e'))
 		return invalid("bad integer value", *off);
 	b = alloc(BENCODE_INT);
-	if (b == NULL) {
-		fprintf(stderr, "bencode: No memory for int\n");
+	if (b == NULL)
 		return NULL;
-	}
 	b->ll = ll;
 	*off = newoff;
 	return (struct bencode *) b;
@@ -230,17 +225,13 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off,
 	size_t newoff = *off + 1;
 
 	l = alloc(BENCODE_LIST);
-	if (l == NULL) {
-		fprintf(stderr, "bencode: No memory for list\n");
+	if (l == NULL)
 		return NULL;
-	}
 
 	l->alloc = 4;
 	l->values = malloc(sizeof(l->values[0]) * l->alloc);
-	if (l->values == NULL) {
-		fprintf(stderr, "bencode: No memory for list values\n");
+	if (l->values == NULL)
 		goto error;
-	}
 
 	while (newoff < len && data[newoff] != 'e') {
 		struct bencode *b;
@@ -306,14 +297,12 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 
 	/* Allocate string structure and copy data into it */
 	b = alloc(BENCODE_STR);
-	if (b == NULL) {
-		fprintf(stderr, "bencode: No memory for str structure\n");
+	if (b == NULL)
 		return NULL;
-	}
+
 	b->s = malloc(datalen);
 	if (b->s == NULL) {
 		free(b);
-		fprintf(stderr, "bencode: No memory for string\n");
 		return NULL;
 	}
 	memcpy(b->s, data + newoff, datalen);
@@ -413,4 +402,52 @@ void ben_free(struct bencode *b)
 
 	memset(b, -1, type_size(b->type)); /* data poison */
 	free(b);
+}
+
+struct bencode *ben_blob(const void *data, size_t len)
+{
+	struct bencode_str *b = alloc(BENCODE_STR);
+	if (b == NULL)
+		return NULL;
+	b->s = malloc(len);
+	if (b->s == NULL) {
+		free(b);
+		return NULL;
+	}
+	memcpy(b->s, data, len);
+	b->len = len;
+	return (struct bencode *) b;
+}
+
+struct bencode *ben_bool(int boolean)
+{
+	struct bencode_bool *b = alloc(BENCODE_BOOL);
+	if (b == NULL)
+		return NULL;
+	b->b = boolean;
+	return (struct bencode *) b;
+}
+
+struct bencode *ben_dict(void)
+{
+	return alloc(BENCODE_DICT);
+}
+
+struct bencode *ben_int(long long ll)
+{
+	struct bencode_int *b = alloc(BENCODE_INT);
+	if (b == NULL)
+		return NULL;
+	b->ll = ll;
+	return (struct bencode *) b;
+}
+
+struct bencode *ben_list(void)
+{
+	return alloc(BENCODE_LIST);
+}
+
+struct bencode *ben_str(const char *s)
+{
+	return ben_blob(s, strlen(s));
 }

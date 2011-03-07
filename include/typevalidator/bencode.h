@@ -53,4 +53,11 @@ struct bencode *ben_decode(const void *data, size_t len);
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off);
 void ben_free(struct bencode *b);
 
+struct bencode *ben_blob(const void *data, size_t len);
+struct bencode *ben_bool(int b);
+struct bencode *ben_dict(void);
+struct bencode *ben_int(long long ll);
+struct bencode *ben_list(void);
+struct bencode *ben_str(const char *s);
+
 #endif
