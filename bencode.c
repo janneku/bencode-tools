@@ -82,13 +82,19 @@ static int resize_dict(struct bencode_dict *d)
 	if (d->alloc >= maxalloc)
 		return -1;
 
-	d->alloc *= 2;
+	if (d->alloc == 0)
+		d->alloc = 4;
+	else
+		d->alloc *= 2;
 	newsize = sizeof(d->values[0]) * d->alloc;
 
 	newkeys = realloc(d->keys, newsize);
 	newvalues = realloc(d->values, newsize);
-	if (newkeys == NULL || newvalues == NULL)
+	if (newkeys == NULL || newvalues == NULL) {
+		free(newkeys);
+		free(newvalues);
 		return -1;
+	}
 	d->keys = newkeys;
 	d->values = newvalues;
 	return 0;
@@ -106,17 +112,6 @@ static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 	if (d == NULL) {
 		fprintf(stderr, "bencode: Not enough memory for dict\n");
 		return NULL;
-	}
-
-	d->alloc = 4;
-	d->keys = malloc(sizeof(d->keys[0]) * d->alloc);
-	d->values = malloc(sizeof(d->values[0]) * d->alloc);
-	if (d->keys == NULL || d->values == NULL) {
-		free(d->keys);
-		d->keys = NULL;
-		free(d->values);
-		d->values = NULL;
-		goto error;
 	}
 
 	while (newoff < len && data[newoff] != 'e') {
@@ -209,8 +204,13 @@ static int resize_list(struct bencode_list *list)
 
 	if (list->alloc >= maxalloc)
 		return -1;
-	list->alloc *= 2;
+
+	if (list->alloc == 0)
+		list->alloc = 4;
+	else
+		list->alloc *= 2;
 	newsize = sizeof(list->values[0]) * list->alloc;
+
 	newvalues = realloc(list->values, newsize);
 	if (newvalues == NULL)
 		return -1;
@@ -228,18 +228,15 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off,
 	if (l == NULL)
 		return NULL;
 
-	l->alloc = 4;
-	l->values = malloc(sizeof(l->values[0]) * l->alloc);
-	if (l->values == NULL)
-		goto error;
-
 	while (newoff < len && data[newoff] != 'e') {
 		struct bencode *b;
 		b = decode(data, len, &newoff, level);
 		if (b == NULL)
 			goto error;
-		if (ben_list_append((struct bencode *) l, b))
+		if (ben_list_append((struct bencode *) l, b)) {
+			ben_free(b);
 			goto error;
+		}
 	}
 
 	if (newoff >= len) {
@@ -373,6 +370,93 @@ static void free_list(struct bencode_list *list)
 	}
 }
 
+static int serialize(struct bencode *targetlist, const struct bencode *b)
+{
+	const struct bencode_bool *boolean;
+	const struct bencode_list *list;
+	struct bencode *s;
+	char buf[23];
+	size_t pos;
+
+	switch (b->type) {
+	case BENCODE_BOOL:
+		boolean = ben_bool_const_cast(b);
+		buf[0] = 'b';
+		buf[1] = boolean->b ? '1' : '0';
+		s = ben_blob(buf, 2);
+		if (s == NULL)
+			return -1;
+		ben_list_append(targetlist, s);
+		break;
+
+	case BENCODE_LIST:
+		list = ben_list_const_cast(b);
+		for (pos = 0; pos < list->n; pos++) {
+			assert(0);
+			/*ben_list_append(*/
+		}
+
+	default:
+		fprintf(stderr, "bencode: serialization type %d not implemented\n", b->type);
+		exit(1);
+	}
+	return 0;
+}
+
+static size_t get_size(const struct bencode *b)
+{
+	size_t pos;
+	const struct bencode_dict *d;
+	const struct bencode_int *i;
+	const struct bencode_list *l;
+	const struct bencode_str *s;
+	size_t size = 0;
+	char buf[1];
+
+	switch (b->type) {
+	case BENCODE_BOOL:
+		return 2;
+	case BENCODE_DICT:
+		d = ben_dict_const_cast(b);
+		for (pos = 0; pos < d->n; pos++) {
+			size += get_size(d->keys[pos]);
+			size += get_size(d->values[pos]);
+		}
+		return size + 2;
+	case BENCODE_INT:
+		i = ben_int_const_cast(b);
+		return 2 + snprintf(buf, 0, "%lld", i->ll);
+	case BENCODE_LIST:
+		l = ben_list_const_cast(b);
+		for (pos = 0; pos < l->n; pos++)
+			size += get_size(l->values[pos]);
+		return size + 2;
+	case BENCODE_STR:
+		s = ben_str_const_cast(b);
+		return snprintf(buf, 0, "%zu", s->len) + 1 + s->len;
+	default:
+		fprintf(stderr, "bencode: invalid bencode type: %c\n", b->type);
+		exit(1);
+	}
+}
+
+size_t ben_encoded_size(const struct bencode *b)
+{
+	return get_size(b);
+}
+
+void *ben_encode(size_t *len, const struct bencode *b)
+{
+	struct bencode *list = ben_list();
+	if (serialize(list, b)) {
+		ben_free(list);
+		return NULL;
+	}
+	assert(0);
+	ben_free(list);
+	return NULL;
+}
+
 void ben_free(struct bencode *b)
 {
 	if (b == NULL)
@@ -420,7 +504,7 @@ struct bencode *ben_bool(int boolean)
 	struct bencode_bool *b = alloc(BENCODE_BOOL);
 	if (b == NULL)
 		return NULL;
-	b->b = boolean;
+	b->b = boolean ? 1 : 0;
 	return (struct bencode *) b;
 }
 

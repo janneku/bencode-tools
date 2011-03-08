@@ -100,6 +100,33 @@ static void dicttest(const char *s, size_t len, size_t expected, int success)
 	ben_free((struct bencode *) b);
 }
 
+static void encoded_size_tests(void)
+{
+	struct bencode *d;
+	struct bencode *l;
+
+	assert(ben_encoded_size(ben_bool(0)) == 2);
+	assert(ben_encoded_size(ben_bool(1)) == 2);
+
+	assert(ben_encoded_size(ben_int(-10)) == 5);
+	assert(ben_encoded_size(ben_int(-1)) == 4);
+	assert(ben_encoded_size(ben_int(0)) == 3);
+	assert(ben_encoded_size(ben_int(1)) == 3);
+	assert(ben_encoded_size(ben_int(10)) == 4);
+
+	assert(ben_encoded_size(ben_str("marklar")) == 9);
+
+	l = ben_list();
+	assert(ben_encoded_size(l) == 2);
+	ben_list_append(l, ben_int(0));
+	assert(ben_encoded_size(l) == 5);
+	ben_list_append(l, ben_str("marklar"));
+	assert(ben_encoded_size(l) == 14);
+
+	d = ben_dict();
+	assert(ben_encoded_size(d) == 2);
+}
+
 int main(void)
 {
 	booltest("b0", 1, 0, 0);
@@ -132,6 +159,8 @@ int main(void)
 	dicttest("di0e7:marklare", 13, 1, 0);
 	dicttest("di0e7:marklari0e7:marklare", 26, 2, 1);
 	dicttest("de", 2, 0, 1);
+
+	encoded_size_tests();
 
 	return 0;
 }
