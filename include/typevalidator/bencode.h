@@ -53,6 +53,7 @@ struct bencode *ben_decode(const void *data, size_t len);
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off);
 size_t ben_encoded_size(const struct bencode *b);
 void *ben_encode(size_t *len, const struct bencode *b);
+size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b);
 void ben_free(struct bencode *b);
 
 struct bencode *ben_blob(const void *data, size_t len);

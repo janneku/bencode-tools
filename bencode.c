@@ -370,37 +370,93 @@ static void free_list(struct bencode_list *list)
 	}
 }
 
-static int serialize(struct bencode *targetlist, const struct bencode *b)
+static int putonechar(char *data, size_t size, size_t *pos, char c)
 {
-	const struct bencode_bool *boolean;
+	if (*pos >= size)
+		return -1;
+	data[*pos] = c;
+	*pos += 1;
+	return 0;
+}
+
+static int serialize(char *data, size_t size, size_t *pos,
+		     const struct bencode *b)
+{
+	const struct bencode_dict *dict;
+	const struct bencode_int *integer;
 	const struct bencode_list *list;
-	struct bencode *s;
-	char buf[23];
-	size_t pos;
+	const struct bencode_str *s;
+	size_t i;
+	int len;
 
 	switch (b->type) {
 	case BENCODE_BOOL:
-		boolean = ben_bool_const_cast(b);
-		buf[0] = 'b';
-		buf[1] = boolean->b ? '1' : '0';
-		s = ben_blob(buf, 2);
-		if (s == NULL)
+		if ((*pos + 2) > size)
 			return -1;
-		ben_list_append(targetlist, s);
-		break;
+		data[*pos] = 'b';
+		data[*pos + 1] = ben_bool_const_cast(b)->b ? '1' : '0';
+		*pos += 2;
+		return 0;
+
+	case BENCODE_DICT:
+		if (putonechar(data, size, pos, 'd'))
+			return -1;
+
+		dict = ben_dict_const_cast(b);
+		for (i = 0; i < dict->n; i++) {
+			if (serialize(data, size, pos, dict->keys[i]))
+				return -1;
+			if (serialize(data, size, pos, dict->values[i]))
+				return -1;
+		}
+
+		return putonechar(data, size, pos, 'e');
+
+	case BENCODE_INT:
+		if (putonechar(data, size, pos, 'i'))
+			return -1;
+
+		integer = ben_int_const_cast(b);
+		len = snprintf(data + *pos, size - *pos, "%lld", integer->ll);
+		assert(len > 0);
+		if ((*pos + len) > size)
+			return -1;
+		*pos += len;
+		
+		return putonechar(data, size, pos, 'e');
 
 	case BENCODE_LIST:
+		if (putonechar(data, size, pos, 'l'))
+			return -1;
+
 		list = ben_list_const_cast(b);
-		for (pos = 0; pos < list->n; pos++) {
-			assert(0);
-			/*ben_list_append(*/
+		for (i = 0; i < list->n; i++) {
+			if (serialize(data, size, pos, list->values[i]))
+				return -1;
 		}
+
+		return putonechar(data, size, pos, 'e');
+
+	case BENCODE_STR:
+		s = ben_str_const_cast(b);
+		len = snprintf(data + *pos, size - *pos, "%zu", s->len);
+		assert(len > 0);
+		if ((*pos + len) > size)
+			return -1;
+		*pos += len;
+
+		if (putonechar(data, size, pos, ':'))
+			return -1;
+
+		if ((*pos + s->len) > size)
+			return -1;
+		memcpy(data + *pos, s->s, s->len);
+		return 0;
 
 	default:
 		fprintf(stderr, "bencode: serialization type %d not implemented\n", b->type);
 		exit(1);
 	}
-	return 0;
 }
 
 static size_t get_size(const struct bencode *b)
@@ -447,14 +503,27 @@ size_t ben_encoded_size(const struct bencode *b)
 
 void *ben_encode(size_t *len, const struct bencode *b)
 {
-	struct bencode *list = ben_list();
-	if (serialize(list, b)) {
-		ben_free(list);
+	size_t size = get_size(b);
+	void *data = malloc(size);
+	if (data == NULL) {
+		fprintf(stderr, "bencode: No memory to encode\n");
 		return NULL;
 	}
-	assert(0);
-	ben_free(list);
-	return NULL;
+	*len = 0;
+	if (serialize(data, size, len, b)) {
+		free(data);
+		return NULL;
+	}
+	assert(*len == size);
+	return data;
+}
+
+size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b)
+{
+	size_t pos = 0;
+	if (serialize(data, maxlen, &pos, b))
+		return -1;
+	return pos;
 }
 
 void ben_free(struct bencode *b)
