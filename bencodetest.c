@@ -165,6 +165,9 @@ static void misctests(void)
 		"b1",
 		"lb1i2ee",
 		"li2eb0e",
+		"l0:0:0:e",
+		"l3:asd2:xye",
+		"di1e0:e",
 		NULL
 	       };
 	const char *invalidvectors[] = {
@@ -179,6 +182,18 @@ static void misctests(void)
 		"35208734823ljdahflajhdf",
 		"2:abfdjslhfld",
 		"02:xy",
+		"d",
+		"i",
+		"l",
+		"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+		"leanfdldjfh",
+		"relwjhrlewjh",
+		"defoobar",
+		"d3:fooe",
+		"d1:b0:1:a0:e", /* demand order for keys */
+		"di1e0:i0e0:e", /* demand order for keys */
+		"d1:a0:1:a0:e", /* disallow same two keys */
+		"di0e0:i0e0:e", /* disallow same two keys */
 		NULL
 	       };
 	testvectors(validvectors, 1);
@@ -217,7 +232,7 @@ int main(void)
 
 	dicttest("di0e7:marklare", 14, 1, 1);
 	dicttest("di0e7:marklare", 13, 1, 0);
-	dicttest("di0e7:marklari0e7:marklare", 26, 2, 1);
+	dicttest("di0e7:marklari1e7:marklare", 26, 2, 1);
 	dicttest("de", 2, 0, 1);
 
 	encoded_size_tests();
