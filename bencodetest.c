@@ -102,10 +102,14 @@ static void dicttest(const char *s, size_t len, size_t expected, int success)
 
 static void encoded_size_tests(void)
 {
+	struct bencode *key;
+	struct bencode *value;
+	struct bencode *b;
 	struct bencode *d;
 	struct bencode *l;
 	char data[4096];
 	size_t s;
+	size_t pos;
 
 	assert(ben_encoded_size(ben_bool(0)) == 2);
 	assert(ben_encoded_size(ben_bool(1)) == 2);
@@ -124,6 +128,12 @@ static void encoded_size_tests(void)
 	assert(ben_encoded_size(l) == 5);
 	ben_list_append(l, ben_str("marklar"));
 	assert(ben_encoded_size(l) == 14);
+	s = 0;
+	ben_list_for_each(b, pos, l)
+		s += ben_encoded_size(b);
+	assert(s == 12);
+	ben_free(l);
+	l = NULL;
 
 	d = ben_dict();
 	assert(ben_encoded_size(d) == 2);
@@ -133,6 +143,12 @@ static void encoded_size_tests(void)
 	s = ben_encode2(data, sizeof data, d);
 	assert(s == 12);
 	assert(memcmp(data, "di0e0:i1e0:e", s) == 0);
+	s = 0;
+	ben_dict_for_each(key, value, pos, d) {
+		s += ben_encoded_size(key);
+		s += ben_encoded_size(value);
+	}
+	assert(s == 10);
 	ben_free(d);
 }
 

@@ -168,4 +168,12 @@ static inline const char *ben_str_val(const struct bencode *b)
 	return ben_str_const_cast(b)->s;
 }
 
+/* pos is a size_t */
+#define ben_list_for_each(b, pos, l) \
+	for ((pos) = 0; (b) = ((const struct bencode_list *) (l))->values[(pos)], (pos) < ((const struct bencode_list *) (l))->n; (pos)++)
+
+/* pos is a size_t */
+#define ben_dict_for_each(key, value, pos, d) \
+	for ((pos) = 0; (key) = ((const struct bencode_dict *) (d))->keys[(pos)], (value) = ((const struct bencode_dict *) (d))->values[(pos)], (pos) < ((const struct bencode_dict *) (d))->n; (pos)++)
+
 #endif
