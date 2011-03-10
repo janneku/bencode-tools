@@ -127,6 +127,39 @@ static void encoded_size_tests(void)
 	assert(ben_encoded_size(d) == 2);
 }
 
+static void misctests(void)
+{
+	const char *bencodevectors[] = {"i4e",
+					"i0e",
+					"i-10e",
+					"i9223372036854775807e",
+					"i-9223372036854775808e",
+					"0:",
+					"3:abc",
+					"10:1234567890",
+					"le",
+					"li1ei2ei3ee",
+					"ll5:Alice3:Bobeli2ei3eee",
+					"de",
+					"d3:agei25e4:eyes4:bluee",
+					"d8:spam.mp3d6:author5:Alice6:lengthi100000eee",
+					"b0",
+					"b1",
+					"lb1i2ee",
+					"li2eb0e",
+					NULL
+				       };
+	const char **vec = bencodevectors;
+	while (*vec != NULL) {
+		struct bencode * b = ben_decode(*vec, strlen(*vec));
+		if (b == NULL) {
+			fprintf(stderr, "test vector %s failed\n", *vec);
+			exit(1);
+		}
+		vec++;
+	}
+}
+
 int main(void)
 {
 	booltest("b0", 1, 0, 0);
@@ -161,6 +194,8 @@ int main(void)
 	dicttest("de", 2, 0, 1);
 
 	encoded_size_tests();
+
+	misctests();
 
 	return 0;
 }
