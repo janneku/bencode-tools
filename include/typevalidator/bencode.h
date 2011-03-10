@@ -148,7 +148,7 @@ static inline size_t ben_str_len(const struct bencode *b)
 	return ben_str_const_cast(b)->len;
 }
 
-static inline long long ben_vool_val(const struct bencode *b)
+static inline long long ben_bool_val(const struct bencode *b)
 {
 	return ben_bool_const_cast(b)->b ? 1 : 0;
 }
