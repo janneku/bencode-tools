@@ -127,37 +127,62 @@ static void encoded_size_tests(void)
 	assert(ben_encoded_size(d) == 2);
 }
 
-static void misctests(void)
+static void testvectors(const char **vec, int success)
 {
-	const char *bencodevectors[] = {"i4e",
-					"i0e",
-					"i-10e",
-					"i9223372036854775807e",
-					"i-9223372036854775808e",
-					"0:",
-					"3:abc",
-					"10:1234567890",
-					"le",
-					"li1ei2ei3ee",
-					"ll5:Alice3:Bobeli2ei3eee",
-					"de",
-					"d3:agei25e4:eyes4:bluee",
-					"d8:spam.mp3d6:author5:Alice6:lengthi100000eee",
-					"b0",
-					"b1",
-					"lb1i2ee",
-					"li2eb0e",
-					NULL
-				       };
-	const char **vec = bencodevectors;
 	while (*vec != NULL) {
 		struct bencode * b = ben_decode(*vec, strlen(*vec));
-		if (b == NULL) {
-			fprintf(stderr, "test vector %s failed\n", *vec);
+		if (success && b == NULL) {
+			fprintf(stderr, "test vector %s failed. it should be valid.)\n", *vec);
 			exit(1);
 		}
+		if (!success && b != NULL) {
+			fprintf(stderr, "test vector %s failed. it should be invalid.\n", *vec);
+			exit(1);
+		}
+		ben_free(b);
 		vec++;
 	}
+}
+
+static void misctests(void)
+{
+	const char *validvectors[] = {
+		"i4e",
+		"i0e",
+		"i-10e",
+		"i9223372036854775807e",
+		"i-9223372036854775808e",
+		"0:",
+		"3:abc",
+		"10:1234567890",
+		"le",
+		"li1ei2ei3ee",
+		"ll5:Alice3:Bobeli2ei3eee",
+		"de",
+		"d3:agei25e4:eyes4:bluee",
+		"d8:spam.mp3d6:author5:Alice6:lengthi100000eee",
+		"b0",
+		"b1",
+		"lb1i2ee",
+		"li2eb0e",
+		NULL
+	       };
+	const char *invalidvectors[] = {
+		"0:0:",
+		"ie",
+		"i341foo382e",
+		"i 0e",
+		"i-0e",
+		"i123",
+		"",
+		"i6easd",
+		"35208734823ljdahflajhdf",
+		"2:abfdjslhfld",
+		"02:xy",
+		NULL
+	       };
+	testvectors(validvectors, 1);
+	testvectors(invalidvectors, 0);
 }
 
 int main(void)
@@ -174,6 +199,7 @@ int main(void)
 	inttest("i1e", 3, 1, 1);
 	inttest("ie", 2, 0, 0);
 	inttest("i1ke", 4, 1, 0);
+	inttest("i123456789e", 11, 123456789, 1);
 
 	strtest("0:", 2, "", 1);
 	strtest("7:marklar", 9, "marklar", 1);
