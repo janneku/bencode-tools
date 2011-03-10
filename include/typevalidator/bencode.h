@@ -161,7 +161,6 @@ static inline long long ben_int_val(const struct bencode *b)
 /* Note: the string is not zero terminated */
 static inline const char *ben_str_val(const struct bencode *b)
 {
-
 	return ben_str_const_cast(b)->s;
 }
 
