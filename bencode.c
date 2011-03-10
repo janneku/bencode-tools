@@ -181,10 +181,13 @@ static int read_long_long(long long *ll, const char *data, size_t len,
 		return -1;
 
 	/*
-	 * Encoded zero must be in canonical form exactly ("i0e") to preserve
-	 * uniqueness of coding format, and thus hashes
+	 * Demand a unique encoding for all integers.
+	 * Zero may not begin with a (minus) sign.
+	 * Non-zero integers may not have leading zeros in the encoding.
 	 */
-	if (*ll == 0 && pos != (*off + 1))
+	if (buf[0] == '-' && buf[1] == '0')
+		return -1;
+	if (buf[0] == '0' && pos != (*off + 1))
 		return -1;
 
 	*off = pos + 1;
