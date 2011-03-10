@@ -23,6 +23,8 @@ def decode_bool(x, f):
 def decode_int(x, f):
     f = f+1
     newf = x.index('e', f)
+    if x[f] != '-' and x[f].isdigit() == False:
+        raise ValueError
     try:
         n = int(x[f:newf])
     except (OverflowError, ValueError):
@@ -113,6 +115,11 @@ def test_bdecode():
     assert bdecode('i-10e') == -10L
     try:
         bdecode('i-0e')
+        assert 0
+    except ValueError:
+        pass
+    try:
+        bdecode('i 2e')
         assert 0
     except ValueError:
         pass
