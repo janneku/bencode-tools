@@ -7,6 +7,11 @@
 #include <errno.h>
 #include <ctype.h>
 
+struct bencode_keyvalue {
+	struct bencode *key;
+	struct bencode *value;
+};
+
 static struct bencode *decode(const char *data, size_t len, size_t *off,
 			      int level);
 
@@ -134,7 +139,9 @@ static int bencmp(const struct bencode *a, const struct bencode *b)
 
 static int bencmpqsort(const void *a, const void *b)
 {
-	return bencmp(a, b);
+	const struct bencode *akey = ((const struct bencode_keyvalue *) a)->key;
+	const struct bencode *bkey = ((const struct bencode_keyvalue *) b)->key;
+	return bencmp(akey, bkey);
 }
 
 static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
@@ -442,9 +449,9 @@ static int serialize(char *data, size_t size, size_t *pos,
 	const struct bencode_int *integer;
 	const struct bencode_list *list;
 	const struct bencode_str *s;
-	struct bencode **keys;
 	size_t i;
 	int len;
+	struct bencode_keyvalue *pairs;
 
 	switch (b->type) {
 	case BENCODE_BOOL:
@@ -461,25 +468,25 @@ static int serialize(char *data, size_t size, size_t *pos,
 
 		dict = ben_dict_const_cast(b);
 
-		keys = malloc(dict->n * sizeof(keys[0]));
-		if (keys == NULL) {
+		pairs = malloc(dict->n * sizeof(pairs[0]));
+		if (pairs == NULL) {
 			fprintf(stderr, "bencode: No memory for dict serialization\n");
 			return -1;
 		}
-		for (i = 0; i < dict->n; i++)
-			keys[i] = dict->keys[i];
-		qsort(keys, dict->n, sizeof(keys[0]), bencmpqsort);
+		for (i = 0; i < dict->n; i++) {
+			pairs[i].key = dict->keys[i];
+			pairs[i].value = dict->values[i];
+		}
+		qsort(pairs, dict->n, sizeof(pairs[0]), bencmpqsort);
 
 		for (i = 0; i < dict->n; i++) {
-			struct bencode *value;
-			if (serialize(data, size, pos, keys[i]))
+			if (serialize(data, size, pos, pairs[i].key))
 				break;
-			value = ben_dict_get(b, keys[i]);
-			if (serialize(data, size, pos, value))
+			if (serialize(data, size, pos, pairs[i].value))
 				break;
 		}
-		free(keys);
-		keys = NULL;
+		free(pairs);
+		pairs = NULL;
 		if (i < dict->n)
 			return -1;
 
