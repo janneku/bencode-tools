@@ -104,6 +104,8 @@ static void encoded_size_tests(void)
 {
 	struct bencode *d;
 	struct bencode *l;
+	char data[4096];
+	size_t s;
 
 	assert(ben_encoded_size(ben_bool(0)) == 2);
 	assert(ben_encoded_size(ben_bool(1)) == 2);
@@ -125,6 +127,13 @@ static void encoded_size_tests(void)
 
 	d = ben_dict();
 	assert(ben_encoded_size(d) == 2);
+	ben_dict_set(d, ben_int(1), ben_str(""));
+	ben_dict_set(d, ben_int(0), ben_str(""));
+	ben_dict_set(d, ben_int(0), ben_str(""));
+	s = ben_encode2(data, sizeof data, d);
+	assert(s == 12);
+	assert(memcmp(data, "di0e0:i1e0:e", s) == 0);
+	ben_free(d);
 }
 
 static void testvectors(const char **vec, int success)
