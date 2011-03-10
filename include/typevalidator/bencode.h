@@ -158,7 +158,11 @@ static inline long long ben_int_val(const struct bencode *b)
 	return ben_int_const_cast(b)->ll;
 }
 
-/* Note: the string is not zero terminated */
+/*
+ * Note: the string is always zero terminated. Also, the string may
+ * contain more than one zero.
+ * bencode strings are not compatible with C strings.
+ */
 static inline const char *ben_str_val(const struct bencode *b)
 {
 	return ben_str_const_cast(b)->s;

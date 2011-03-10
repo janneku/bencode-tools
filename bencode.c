@@ -334,7 +334,7 @@ static size_t read_size_t(const char *data, size_t len, size_t *off, int c)
 static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 {
 	size_t datalen;
-	struct bencode_str *b;
+	struct bencode *b;
 	size_t newoff = *off;
 
 	/* Read the string length */
@@ -346,20 +346,11 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 		return invalid("string out of bounds", *off);
 
 	/* Allocate string structure and copy data into it */
-	b = alloc(BENCODE_STR);
+	b = ben_blob(data + newoff, datalen);
 	if (b == NULL)
 		return NULL;
-
-	b->s = malloc(datalen);
-	if (b->s == NULL) {
-		free(b);
-		return NULL;
-	}
-	memcpy(b->s, data + newoff, datalen);
-	b->len = datalen;
-
 	*off = newoff + datalen;
-	return (struct bencode *) b;
+	return b;
 }
 
 static struct bencode *decode(const char *data, size_t len, size_t *off,
@@ -640,13 +631,15 @@ struct bencode *ben_blob(const void *data, size_t len)
 	struct bencode_str *b = alloc(BENCODE_STR);
 	if (b == NULL)
 		return NULL;
-	b->s = malloc(len);
+	/* Allocate one extra byte for zero termination for convenient use */
+	b->s = malloc(len + 1);
 	if (b->s == NULL) {
 		free(b);
 		return NULL;
 	}
 	memcpy(b->s, data, len);
 	b->len = len;
+	b->s[len] = 0;
 	return (struct bencode *) b;
 }
 
