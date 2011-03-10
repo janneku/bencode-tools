@@ -164,6 +164,7 @@ int main(void)
 {
 	booltest("b0", 1, 0, 0);
 	booltest("b0", 2, 0, 1);
+	booltest("b0 ", 3, 0, 0);
 	booltest("b1", 2, 1, 1);
 	booltest("b2", 2, 1, 0);
 

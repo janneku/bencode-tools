@@ -341,8 +341,16 @@ static struct bencode *decode(const char *data, size_t len, size_t *off,
 
 struct bencode *ben_decode(const void *data, size_t len)
 {
+	struct bencode *b;
 	size_t off = 0;
-	return decode((const char *) data, len, &off, 0);
+	b = decode((const char *) data, len, &off, 0);
+	if (b == NULL)
+		return NULL;
+	if (off != len) {
+		ben_free(b);
+		return NULL;
+	}
+	return b;
 }
 
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off)
