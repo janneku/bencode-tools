@@ -101,6 +101,37 @@ static int resize_dict(struct bencode_dict *d)
 	return 0;
 }
 
+static int bencmp(const struct bencode *a, const struct bencode *b)
+{
+	size_t cmplen;
+	int ret;
+	const struct bencode_str *sa;
+	const struct bencode_str *sb;
+
+	if (a->type != b->type)
+		return (a->type == BENCODE_INT) ? -1 : 1;
+
+	if (a->type == BENCODE_INT) {
+		const struct bencode_int *ia = ben_int_const_cast(a);
+		const struct bencode_int *ib = ben_int_const_cast(b);
+		if (ia->ll < ib->ll)
+			return -1;
+		if (ib->ll < ia->ll)
+			return 1;
+		return 0;
+	}
+
+	sa = ben_str_const_cast(a);
+	sb = ben_str_const_cast(b);
+	cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
+	ret = memcmp(sa->s, sb->s, cmplen);
+	if (sa->len == sb->len)
+		return ret;
+	if (ret)
+		return ret;
+	return (sa->len < sb->len) ? -1 : 1;
+}
+
 static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 				   int level)
 {
@@ -129,6 +160,13 @@ static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 			fprintf(stderr, "bencode: Invalid dict key type\n");
 			goto error;
 		}
+		if (d->n > 0 && bencmp(d->keys[d->n - 1], key) != -1) {
+			ben_free(key);
+			key = NULL;
+			fprintf(stderr, "bencode: Invalid key order or non-unique keys\n");
+			goto error;
+		}
+
 		value = decode(data, len, &newoff, level);
 		if (value == NULL) {
 			ben_free(key);
