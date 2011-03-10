@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <ctype.h>
 
 static struct bencode *decode(const char *data, size_t len, size_t *off,
 			      int level);
@@ -171,9 +172,19 @@ static int read_long_long(long long *ll, const char *data, size_t len,
 	memcpy(buf, data + *off, slen);
 	buf[slen] = 0;
 
+	if (buf[0] != '-' && !isdigit(buf[0]))
+		return -1;
+
 	errno = 0;
 	*ll = strtoll(buf, &endptr, 10);
 	if (errno == ERANGE || *endptr != 0)
+		return -1;
+
+	/*
+	 * Encoded zero must be in canonical form exactly ("i0e") to preserve
+	 * uniqueness of coding format, and thus hashes
+	 */
+	if (*ll == 0 && pos != (*off + 1))
 		return -1;
 
 	*off = pos + 1;
