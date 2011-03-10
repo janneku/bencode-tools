@@ -59,10 +59,34 @@ void ben_free(struct bencode *b);
 struct bencode *ben_blob(const void *data, size_t len);
 struct bencode *ben_bool(int b);
 struct bencode *ben_dict(void);
+struct bencode *ben_dict_get(const struct bencode *d, const struct bencode *key);
+struct bencode *ben_dict_pop(struct bencode *d, const struct bencode *key);
+int ben_dict_set(struct bencode *d, struct bencode *key, struct bencode *value);
 struct bencode *ben_int(long long ll);
 struct bencode *ben_list(void);
 int ben_list_append(struct bencode *list, struct bencode *b);
 struct bencode *ben_str(const char *s);
+
+static inline int ben_is_bool(struct bencode *b)
+{
+	return b->type == BENCODE_BOOL;
+}
+static inline int ben_is_dict(struct bencode *b)
+{
+	return b->type == BENCODE_DICT;
+}
+static inline int ben_is_int(struct bencode *b)
+{
+	return b->type == BENCODE_INT;
+}
+static inline int ben_is_list(struct bencode *b)
+{
+	return b->type == BENCODE_LIST;
+}
+static inline int ben_is_str(struct bencode *b)
+{
+	return b->type == BENCODE_STR;
+}
 
 static inline const struct bencode_bool *ben_bool_const_cast(const struct bencode *b)
 {
@@ -107,6 +131,38 @@ static inline const struct bencode_str *ben_str_const_cast(const struct bencode 
 static inline struct bencode_str *ben_str_cast(struct bencode *str)
 {
 	return str->type == BENCODE_STR ? ((struct bencode_str *) str) : NULL;
+}
+
+static inline size_t ben_dict_len(const struct bencode *b)
+{
+	return ben_dict_const_cast(b)->n;
+}
+
+static inline size_t ben_list_len(const struct bencode *b)
+{
+	return ben_list_const_cast(b)->n;
+}
+
+static inline size_t ben_str_len(const struct bencode *b)
+{
+	return ben_str_const_cast(b)->len;
+}
+
+static inline long long ben_vool_val(const struct bencode *b)
+{
+	return ben_bool_const_cast(b)->b ? 1 : 0;
+}
+
+static inline long long ben_int_val(const struct bencode *b)
+{
+	return ben_int_const_cast(b)->ll;
+}
+
+/* Note: the string is not zero terminated */
+static inline const char *ben_str_val(const struct bencode *b)
+{
+
+	return ben_str_const_cast(b)->s;
 }
 
 #endif

@@ -34,7 +34,7 @@ static size_t type_size(int type)
 		return sizeof(struct bencode_str);
 	default:
 		fprintf(stderr, "Unknown bencode type: %d\n", type);
-		exit(1);
+		abort();
 	}
 	return 0;
 }
@@ -130,6 +130,11 @@ static int bencmp(const struct bencode *a, const struct bencode *b)
 	if (ret)
 		return ret;
 	return (sa->len < sb->len) ? -1 : 1;
+}
+
+static int bencmpqsort(const void *a, const void *b)
+{
+	return bencmp(a, b);
 }
 
 static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
@@ -446,6 +451,7 @@ static int serialize(char *data, size_t size, size_t *pos,
 	const struct bencode_int *integer;
 	const struct bencode_list *list;
 	const struct bencode_str *s;
+	struct bencode **keys;
 	size_t i;
 	int len;
 
@@ -463,12 +469,28 @@ static int serialize(char *data, size_t size, size_t *pos,
 			return -1;
 
 		dict = ben_dict_const_cast(b);
-		for (i = 0; i < dict->n; i++) {
-			if (serialize(data, size, pos, dict->keys[i]))
-				return -1;
-			if (serialize(data, size, pos, dict->values[i]))
-				return -1;
+
+		keys = malloc(dict->n * sizeof(keys[0]));
+		if (keys == NULL) {
+			fprintf(stderr, "bencode: No memory for dict serialization\n");
+			return -1;
 		}
+		for (i = 0; i < dict->n; i++)
+			keys[i] = dict->keys[i];
+		qsort(keys, dict->n, sizeof(keys[0]), bencmpqsort);
+
+		for (i = 0; i < dict->n; i++) {
+			struct bencode *value;
+			if (serialize(data, size, pos, keys[i]))
+				break;
+			value = ben_dict_get(b, keys[i]);
+			if (serialize(data, size, pos, value))
+				break;
+		}
+		free(keys);
+		keys = NULL;
+		if (i < dict->n)
+			return -1;
 
 		return putonechar(data, size, pos, 'e');
 
@@ -515,7 +537,7 @@ static int serialize(char *data, size_t size, size_t *pos,
 
 	default:
 		fprintf(stderr, "bencode: serialization type %d not implemented\n", b->type);
-		exit(1);
+		abort();
 	}
 }
 
@@ -552,7 +574,7 @@ static size_t get_size(const struct bencode *b)
 		return snprintf(buf, 0, "%zu", s->len) + 1 + s->len;
 	default:
 		fprintf(stderr, "bencode: invalid bencode type: %c\n", b->type);
-		exit(1);
+		abort();
 	}
 }
 
@@ -606,7 +628,7 @@ void ben_free(struct bencode *b)
 		break;
 	default:
 		fprintf(stderr, "bencode: invalid type: %d\n", b->type);
-		exit(1);
+		abort();
 	}
 
 	memset(b, -1, type_size(b->type)); /* data poison */
@@ -640,6 +662,56 @@ struct bencode *ben_bool(int boolean)
 struct bencode *ben_dict(void)
 {
 	return alloc(BENCODE_DICT);
+}
+
+struct bencode *ben_dict_get(const struct bencode *dict, const struct bencode *key)
+{
+	const struct bencode_dict *d = ben_dict_const_cast(dict);
+	size_t pos;
+	for (pos = 0; pos < d->n; pos++) {
+		if (bencmp(d->keys[pos], key) == 0)
+			return d->values[pos];
+	}
+	return NULL;
+}
+
+static void replacewithlast(struct bencode **arr, size_t i, size_t n)
+{
+	arr[i] = arr[n - 1];
+	arr[n - 1] = NULL;
+}
+
+struct bencode *ben_dict_pop(struct bencode *dict, const struct bencode *key)
+{
+	struct bencode_dict *d = ben_dict_cast(dict);
+	size_t pos;
+	for (pos = 0; pos < d->n; pos++) {
+		if (bencmp(d->keys[pos], key) == 0) {
+			struct bencode *value = d->values[pos];
+			ben_free(d->keys[pos]);
+			replacewithlast(d->keys, pos, d->n);
+			replacewithlast(d->values, pos, d->n);
+			d->n -= 1;
+			return value;
+		}
+	}
+	return NULL;
+}
+
+int ben_dict_set(struct bencode *dict, struct bencode *key, struct bencode *value)
+{
+	struct bencode_dict *d = ben_dict_cast(dict);
+
+	assert(d->n <= d->alloc);
+	if (d->n == d->alloc && resize_dict(d))
+		return -1;
+
+	ben_free(ben_dict_pop(dict, key));
+
+	d->keys[d->n] = key;
+	d->values[d->n] = value;
+	d->n++;
+	return 0;
 }
 
 struct bencode *ben_int(long long ll)
