@@ -196,7 +196,6 @@ def test_bdecode():
         pass
     try:
         bdecode('di1e0:e')
-        assert 0
     except ValueError:
         pass
     try:
@@ -343,12 +342,7 @@ def test_bencode():
     assert bencode(True) == 'b1'
     assert bencode([True, 2]) == 'lb1i2ee'
     assert bencode([2, False]) == 'li2eb0e'
-
-    try:
-        bencode({1: 'foo'})
-    except AssertionError:
-        return
-    assert 0
+    assert bencode({1: 'foo'}) == 'di1e3:fooe'
 
 if __name__ == '__main__':
     test_bdecode()
