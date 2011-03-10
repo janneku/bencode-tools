@@ -11,7 +11,7 @@ all:	libtypevalidator.so bencodetest
 libtypevalidator.so:	$(LIBMODULES)
 	$(CC) -shared -Wl,-soname,libtypevalidator.so -o libtypevalidator.so $(LIBMODULES)
 
-libtypevalidator.o:	bencode.c include/typevalidator/bencode.h
+bencode.o:	bencode.c include/typevalidator/bencode.h
 
 bencodetest:	bencodetest.o libtypevalidator.so
 	$(CC) $(LDFLAGS) -o $@ $< -L. -Wl,-rpath,. -ltypevalidator
