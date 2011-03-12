@@ -65,6 +65,7 @@ int ben_dict_set(struct bencode *d, struct bencode *key, struct bencode *value);
 struct bencode *ben_int(long long ll);
 struct bencode *ben_list(void);
 int ben_list_append(struct bencode *list, struct bencode *b);
+void *ben_print(size_t *len, const struct bencode *b);
 struct bencode *ben_str(const char *s);
 
 static inline int ben_is_bool(struct bencode *b)

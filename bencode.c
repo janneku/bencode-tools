@@ -7,6 +7,13 @@
 #include <errno.h>
 #include <ctype.h>
 
+/*
+ * Buffer size for fitting all unsigned long long and long long integers,
+ * assuming it is at most 64 bits. If long long is larger than 64 bits,
+ * an error is produced when too large an integer is converted.
+ */
+#define LONGLONGSIZE 21
+
 struct bencode_keyvalue {
 	struct bencode *key;
 	struct bencode *value;
@@ -198,7 +205,7 @@ error:
 static int read_long_long(long long *ll, const char *data, size_t len,
 			  size_t *off, int c)
 {
-	char buf[21]; /* fits all 64 bit integers */
+	char buf[LONGLONGSIZE]; /* fits all 64 bit integers */
 	size_t pos;
 	char *endptr;
 	size_t slen;
@@ -431,6 +438,207 @@ static int putonechar(char *data, size_t size, size_t *pos, char c)
 	return 0;
 }
 
+static int puthexchar(char *data, size_t size, size_t *pos, unsigned char hex)
+{
+	char buf[5];
+	int len = snprintf(buf, sizeof buf, "\\x%.2x", hex);
+	assert(len == 4);
+	if ((*pos + len) > size)
+		return -1;
+	memcpy(data + *pos, buf, len);
+	*pos += len;
+	return 0;
+}
+
+static int putlonglong(char *data, size_t size, size_t *pos, long long ll)
+{
+	char buf[LONGLONGSIZE];
+	int len = snprintf(buf, sizeof buf, "%lld", ll);
+	assert(len > 0);
+	if ((*pos + len) > size)
+		return -1;
+	memcpy(data + *pos, buf, len);
+	*pos += len;
+	return 0;
+}
+
+static int putunsignedlonglong(char *data, size_t size, size_t *pos,
+			       unsigned long long llu)
+{
+	char buf[LONGLONGSIZE];
+	int len = snprintf(buf, sizeof buf, "%llu", llu);
+	assert(len > 0);
+	if ((*pos + len) > size)
+		return -1;
+	memcpy(data + *pos, buf, len);
+	*pos += len;
+	return 0;
+}
+
+static int putstr(char *data, size_t size, size_t *pos, char *s)
+{
+	size_t len = strlen(s);
+	if (*pos + len > size)
+		return -1;
+	memcpy(data + *pos, s, len);
+	*pos += len;
+	return 0;
+}
+
+static int print(char *data, size_t size, size_t *pos, const struct bencode *b)
+{
+	const struct bencode_bool *boolean;
+	const struct bencode_dict *dict;
+	const struct bencode_int *integer;
+	const struct bencode_list *list;
+	const struct bencode_str *s;
+	size_t i;
+	int len;
+	struct bencode_keyvalue *pairs;
+
+	switch (b->type) {
+	case BENCODE_BOOL:
+		boolean = ben_bool_const_cast(b);
+		len = boolean->b ? 4 : 5;
+		if (*pos + len > size)
+			return -1;
+		memcpy(data + *pos, (len == 4) ? "True" : "False", len);
+		*pos += len;
+		return 0;
+
+	case BENCODE_DICT:
+		if (putonechar(data, size, pos, '{'))
+			return -1;
+
+		dict = ben_dict_const_cast(b);
+
+		pairs = malloc(dict->n * sizeof(pairs[0]));
+		if (pairs == NULL) {
+			fprintf(stderr, "bencode: No memory for dict serialization\n");
+			return -1;
+		}
+		for (i = 0; i < dict->n; i++) {
+			pairs[i].key = dict->keys[i];
+			pairs[i].value = dict->values[i];
+		}
+		qsort(pairs, dict->n, sizeof(pairs[0]), bencmpqsort);
+
+		for (i = 0; i < dict->n; i++) {
+			if (print(data, size, pos, pairs[i].key))
+				break;
+			if (putstr(data, size, pos, ": "))
+				break;
+			if (print(data, size, pos, pairs[i].value))
+				break;
+			if (i < (dict->n - 1)) {
+				if (putstr(data, size, pos, ", "))
+					break;
+			}
+		}
+		free(pairs);
+		pairs = NULL;
+		if (i < dict->n)
+			return -1;
+
+		return putonechar(data, size, pos, '}');
+
+	case BENCODE_INT:
+		integer = ben_int_const_cast(b);
+
+		if (putlonglong(data, size, pos, integer->ll))
+			return -1;
+
+		return 0;
+
+	case BENCODE_LIST:
+		if (putonechar(data, size, pos, '['))
+			return -1;
+		list = ben_list_const_cast(b);
+		for (i = 0; i < list->n; i++) {
+			if (print(data, size, pos, list->values[i]))
+				return -1;
+			if (i < (list->n - 1) && putstr(data, size, pos, ", "))
+				return -1;
+		}
+		return putonechar(data, size, pos, ']');
+
+	case BENCODE_STR:
+		s = ben_str_const_cast(b);
+		if (putonechar(data, size, pos, '\''))
+			return -1;
+		for (i = 0; i < s->len; i++) {
+			if (isprint(s->s[i])) {
+				if (putonechar(data, size, pos, s->s[i]))
+					return -1;
+			} else {
+				if (puthexchar(data, size, pos, s->s[i]))
+					return -1;
+			}
+		}
+		return putonechar(data, size, pos, '\'');
+	default:
+		fprintf(stderr, "bencode: serialization type %d not implemented\n", b->type);
+		abort();
+	}
+}
+
+static size_t get_printed_size(const struct bencode *b)
+{
+	size_t pos;
+	const struct bencode_bool *boolean;
+	const struct bencode_dict *d;
+	const struct bencode_int *i;
+	const struct bencode_list *l;
+	const struct bencode_str *s;
+	size_t size = 0;
+	char buf[1];
+
+	switch (b->type) {
+	case BENCODE_BOOL:
+		boolean = ben_bool_const_cast(b);
+		return boolean->b ? 4 : 5; /* "True" and "False" */
+	case BENCODE_DICT:
+		size += 1; /* "{" */
+		d = ben_dict_const_cast(b);
+		for (pos = 0; pos < d->n; pos++) {
+			size += get_printed_size(d->keys[pos]);
+			size += 2; /* ": " */
+			size += get_printed_size(d->values[pos]);
+			if (pos < (d->n - 1))
+				size += 2; /* ", " */
+		}
+		size += 1; /* "}" */
+		return size;
+	case BENCODE_INT:
+		i = ben_int_const_cast(b);
+		return snprintf(buf, 0, "%lld", i->ll);
+	case BENCODE_LIST:
+		size += 1; /* "[" */
+		l = ben_list_const_cast(b);
+		for (pos = 0; pos < l->n; pos++) {
+			size += get_printed_size(l->values[pos]);
+			if (pos < (l->n - 1))
+				size += 2; /* ", " */
+		}
+		size += 1; /* "]" */
+		return size;
+	case BENCODE_STR:
+		s = ben_str_const_cast(b);
+		size += 1; /* ' */
+		for (pos = 0; pos < s->len; pos++) {
+			if (isprint(s->s[pos]))
+				size += 1;
+			else
+				size += 4; /* "\xDD" */
+		}
+		size += 1; /* ' */
+		return size;
+	default:
+		fprintf(stderr, "bencode: invalid bencode type: %c\n", b->type);
+		abort();
+	}
+}
+
 static int serialize(char *data, size_t size, size_t *pos,
 		     const struct bencode *b)
 {
@@ -439,7 +647,6 @@ static int serialize(char *data, size_t size, size_t *pos,
 	const struct bencode_list *list;
 	const struct bencode_str *s;
 	size_t i;
-	int len;
 	struct bencode_keyvalue *pairs;
 
 	switch (b->type) {
@@ -484,14 +691,9 @@ static int serialize(char *data, size_t size, size_t *pos,
 	case BENCODE_INT:
 		if (putonechar(data, size, pos, 'i'))
 			return -1;
-
 		integer = ben_int_const_cast(b);
-		len = snprintf(data + *pos, size - *pos, "%lld", integer->ll);
-		assert(len > 0);
-		if ((*pos + len) > size)
+		if (putlonglong(data, size, pos, integer->ll))
 			return -1;
-		*pos += len;
-		
 		return putonechar(data, size, pos, 'e');
 
 	case BENCODE_LIST:
@@ -508,18 +710,14 @@ static int serialize(char *data, size_t size, size_t *pos,
 
 	case BENCODE_STR:
 		s = ben_str_const_cast(b);
-		len = snprintf(data + *pos, size - *pos, "%zu", s->len);
-		assert(len > 0);
-		if ((*pos + len) > size)
+		if (putunsignedlonglong(data, size, pos, ((long long) s->len)))
 			return -1;
-		*pos += len;
-
 		if (putonechar(data, size, pos, ':'))
 			return -1;
-
 		if ((*pos + s->len) > size)
 			return -1;
 		memcpy(data + *pos, s->s, s->len);
+		*pos += s->len;
 		return 0;
 
 	default:
@@ -727,6 +925,25 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	l->values[l->n] = b;
 	l->n += 1;
 	return 0;
+}
+
+/* The returned string is null terminated */
+void *ben_print(size_t *len, const struct bencode *b)
+{
+	size_t size = get_printed_size(b);
+	char *data = malloc(size + 1);
+	if (data == NULL) {
+		fprintf(stderr, "bencode: No memory to print\n");
+		return NULL;
+	}
+	*len = 0;
+	if (print(data, size, len, b)) {
+		free(data);
+		return NULL;
+	}
+	assert(*len == size);
+	data[size] = 0;
+	return data;
 }
 
 struct bencode *ben_str(const char *s)

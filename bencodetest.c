@@ -100,6 +100,52 @@ static void dicttest(const char *s, size_t len, size_t expected, int success)
 	ben_free((struct bencode *) b);
 }
 
+static void print_tests(void)
+{	
+	struct test {
+		char *encoded;
+		size_t len;
+		char *expected;
+	};
+	const struct test table[] = {
+		{"d3:foo3:bare", -1, "{'foo': 'bar'}"},
+		{"di0e0:i1e0:e", -1, "{0: '', 1: ''}"},
+		{"di0eli1eei1e0:e", -1, "{0: [1], 1: ''}"},
+		{"di0eli1ei2eei1e0:e", -1, "{0: [1, 2], 1: ''}"},
+		{"1:\x00", 3, "'\\x00'"},
+		{"1:\xff", 3, "'\\xff'"},
+		{NULL, 0, NULL}};
+
+	size_t i;
+	char *printed;
+	size_t s;
+	struct bencode *b;
+
+	for (i = 0; table[i].encoded != NULL; i++) {
+		const char *encoded = table[i].encoded;
+		size_t len = table[i].len;
+		const char *expected = table[i].expected;
+		if (len == -1)
+			len = strlen(encoded);
+		b = ben_decode(encoded, len);
+		if (b == NULL) {
+			fprintf(stderr, "Failed to decode: %s\n", encoded);
+			exit(1);
+		}
+		printed = ben_print(&s, b);
+		if (printed == NULL) {
+			fprintf(stderr, "Failed to print: %s\n", expected);
+			exit(1);
+		}
+		if (strcmp(printed, expected) != 0) {
+			fprintf(stderr, "Invalid print output: %s vs %s\n", printed, expected);
+			exit(1);
+		}
+		ben_free(b);
+		free(printed);
+	}
+}
+
 static void encoded_size_tests(void)
 {
 	struct bencode *key;
@@ -263,6 +309,8 @@ int main(void)
 	encoded_size_tests();
 
 	misctests();
+
+	print_tests();
 
 	return 0;
 }
