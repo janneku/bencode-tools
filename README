@@ -1,13 +1,8 @@
-== Type validator ==
+== bencode-tools ==
 
-See index.html for more information.
+bencode-tools is a collection of tools for manipulating bencoded data.
+See http://en.wikipedia.org/wiki/Bencode for information on bencode
+format.
 
-== Documentation ==
-
-Documentation is provided as example Python code ;-) See file "examples.py".
-
-examples.py can be generated into html code by using source-highlight tool.
-
-== Web site ==
-
-http://zakalwe.fi/~shd/foss/typevalidator/
+This was formely named 'typevalidator'. With the introduction of
+libbencodetools the project is named 'bencode-tools'.

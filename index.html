@@ -2,10 +2,30 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>Type validator</title>
+<title>bencode-tools</title>
 </head>
 
 <body>
+<h1>bencode-tools</h1>
+
+'bencode-tools' is a collection of C and Python tools for manipulating
+bencoded data. This was formerly named 'type validator'.
+
+<p>
+The collection consists of a C library for reading and writing
+bencoded data, and a Python implementation of bencode included with
+'typevalidator' that can be used to verify typing and contents of
+bencoded messages.
+
+<h1>libbencodetools</h1>
+
+'libbencodetools' is a straightforward C implementation of bencode protocol.
+It can simply be used by including
+<pre>
+#include &lt;bencodetools/bencode.h&gt;
+</pre>
+into your C module and linking the program with '-lbencodetools'.
+
 <h1>Type validator</h1>
 
 <ul>

@@ -1,4 +1,4 @@
-#include <typevalidator/bencode.h>
+#include <bencodetools/bencode.h>
 
 #include <stdlib.h>
 #include <stdio.h>

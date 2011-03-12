@@ -6,15 +6,15 @@ PREFIX = {PREFIX}
 
 LIBMODULES = bencode.o
 
-all:	libtypevalidator.so bencodetest
+all:	libbencodetools.so bencodetest
 
-libtypevalidator.so:	$(LIBMODULES)
-	$(CC) -shared -Wl,-soname,libtypevalidator.so -o libtypevalidator.so $(LIBMODULES)
+libbencodetools.so:	$(LIBMODULES)
+	$(CC) -shared -Wl,-soname,libbencodetools.so -o libbencodetools.so $(LIBMODULES)
 
-bencode.o:	bencode.c include/typevalidator/bencode.h
+bencode.o:	bencode.c include/bencodetools/bencode.h
 
-bencodetest:	bencodetest.o libtypevalidator.so
-	$(CC) $(LDFLAGS) -o $@ $< -L. -Wl,-rpath,. -ltypevalidator
+bencodetest:	bencodetest.o libbencodetools.so
+	$(CC) $(LDFLAGS) -o $@ $< -L. -Wl,-rpath,. -lbencodetools
 
 check:	bencodetest
 	./bencodetest
@@ -22,9 +22,9 @@ check:	bencodetest
 	@echo "All tests successful"
 
 install:	
-	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/typevalidator"
-	install -m 644 include/typevalidator/*.h "$(PREFIX)/include/typevalidator/"
-	install -m 644 libtypevalidator.so "$(PREFIX)/lib/"
+	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/bencodetools"
+	install -m 644 include/bencodetools/*.h "$(PREFIX)/include/bencodetools/"
+	install -m 644 libbencodetools.so "$(PREFIX)/lib/"
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $<
