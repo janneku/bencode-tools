@@ -53,12 +53,6 @@ static void *alloc(int type)
 	return b;
 }
 
-static struct bencode *invalid(const char *reason, size_t off)
-{
-	fprintf(stderr, "bencode: %s: invalid data at position %zu\n", reason, off);
-	return NULL;
-}
-
 static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 {
 	struct bencode_bool *b;
