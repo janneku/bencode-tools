@@ -1,20 +1,24 @@
 AR = {AR}
 CC = {CC}
 CFLAGS = -Wall -O2 -g -fPIC -shared -Iinclude {CFLAGS}
+EXECFLAGS = -Wall -O2 -g -Iinclude {CFLAGS}
 LDFLAGS = {LDFLAGS}
 PREFIX = {PREFIX}
 
 LIBMODULES = bencode.o
 
-all:	libbencodetools.so bencodetest
+all:	libbencodetools.so bencodetest bencat
 
 libbencodetools.so:	$(LIBMODULES)
 	$(CC) -shared -Wl,-soname,libbencodetools.so -o libbencodetools.so $(LIBMODULES)
 
 bencode.o:	bencode.c include/bencodetools/bencode.h
 
-bencodetest:	bencodetest.o libbencodetools.so
-	$(CC) $(LDFLAGS) -o $@ $< -L. -Wl,-rpath,. -lbencodetools
+bencodetest:	bencodetest.c libbencodetools.so
+	$(CC) $(EXECFLAGS) -o $@ $< -L. -Wl,-rpath,. -lbencodetools
+
+bencat:	bencat.c libbencodetools.so
+	$(CC) $(EXECFLAGS) -o $@ $(LDFLAGS) $< -lbencodetools
 
 check:	bencodetest
 	./bencodetest
@@ -22,7 +26,7 @@ check:	bencodetest
 	@echo "All tests successful"
 
 install:	
-	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/bencodetools"
+	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/bencodetools" "$(PREFIX)/bin"
 	install -m 644 include/bencodetools/*.h "$(PREFIX)/include/bencodetools/"
 	install -m 644 libbencodetools.so "$(PREFIX)/lib/"
 
@@ -30,4 +34,5 @@ install:
 	$(CC) $(CFLAGS) -c $<
 
 clean:	
-	rm -f *.o *.so
+	rm -f *.o *.so bencodetest bencat
+

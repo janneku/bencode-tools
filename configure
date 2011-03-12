@@ -12,6 +12,7 @@ for opt in "$@" ; do
 		;;
 	--home)
 		prefix="$HOME"
+		LDFLAGS="-L$HOME/lib -Wl,-rpath,$HOME/lib"
 		;;
 	--help)
 		echo ""
