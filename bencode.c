@@ -65,10 +65,10 @@ static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
 	char value;
 	char c;
 	if ((*off + 2) > len)
-		return invalid("Too short a data for bool", *off);
+		return NULL;
 	c = data[*off + 1];
 	if (c != '0' && c != '1')
-		return invalid("Invalid bool value", *off);
+		return NULL;
 	value = (c == '1');
 	b = alloc(BENCODE_BOOL);
 	if (b == NULL)
@@ -175,7 +175,6 @@ static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 		if (d->n > 0 && bencmp(d->keys[d->n - 1], key) != -1) {
 			ben_free(key);
 			key = NULL;
-			fprintf(stderr, "bencode: Invalid key order or non-unique keys\n");
 			goto error;
 		}
 
@@ -189,10 +188,8 @@ static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 		d->values[d->n] = value;
 		d->n++;
 	}
-	if (newoff >= len) {
-		fprintf(stderr, "bencode: Dict not terminated: %zu\n", *off);
+	if (newoff >= len)
 		goto error;
-	}
 
 	*off = newoff + 1;
 
@@ -251,7 +248,7 @@ static struct bencode *decode_int(const char *data, size_t len, size_t *off)
 	long long ll;
 	size_t newoff = *off + 1;
 	if (read_long_long(&ll, data, len, &newoff, 'e'))
-		return invalid("bad integer value", *off);
+		return NULL;
 	b = alloc(BENCODE_INT);
 	if (b == NULL)
 		return NULL;
@@ -303,10 +300,8 @@ static struct bencode *decode_list(const char *data, size_t len, size_t *off,
 		}
 	}
 
-	if (newoff >= len) {
-		fprintf(stderr, "bencode: List not terminated: %zu\n", *off);
+	if (newoff >= len)
 		goto error;
-	}
 
 	*off = newoff + 1;
 
@@ -347,10 +342,10 @@ static struct bencode *decode_str(const char *data, size_t len, size_t *off)
 	/* Read the string length */
 	datalen = read_size_t(data, len, &newoff, ':');
 	if (datalen == -1)
-		return invalid("invalid string length", *off);
+		return NULL;
 
 	if ((newoff + datalen) > len)
-		return invalid("string out of bounds", *off);
+		return NULL;
 
 	/* Allocate string structure and copy data into it */
 	b = ben_blob(data + newoff, datalen);
@@ -390,7 +385,7 @@ static struct bencode *decode(const char *data, size_t len, size_t *off,
 	case 'l':
 		return decode_list(data, len, off, level);
 	default:
-		return invalid("unknown bencode type", *off);
+		return NULL;
 	}
 }
 
