@@ -18,7 +18,7 @@ bencodetest:	bencodetest.c libbencodetools.so
 	$(CC) $(EXECFLAGS) -o $@ $< -L. -Wl,-rpath,. -lbencodetools
 
 bencat:	bencat.c libbencodetools.so
-	$(CC) $(EXECFLAGS) -o $@ $(LDFLAGS) $< -lbencodetools
+	$(CC) $(EXECFLAGS) -o $@ -L. $(LDFLAGS) $< -lbencodetools
 
 check:	bencodetest
 	./bencodetest
