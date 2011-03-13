@@ -7,6 +7,16 @@
 #include <errno.h>
 #include <ctype.h>
 
+#define MAX_ALLOC (((size_t) -1) / sizeof(struct bencode *) / 2)
+
+struct decode {
+	const char *data;
+	const size_t len;
+	size_t off;
+	int error;
+	int level;
+};
+
 /*
  * Buffer size for fitting all unsigned long long and long long integers,
  * assuming it is at most 64 bits. If long long is larger than 64 bits,
@@ -19,8 +29,7 @@ struct bencode_keyvalue {
 	struct bencode *value;
 };
 
-static struct bencode *decode(const char *data, size_t len, size_t *off,
-			      int level);
+static struct bencode *decode(struct decode *ctx);
 
 static size_t find(const char *data, size_t len, size_t off, char c)
 {
@@ -48,7 +57,6 @@ static size_t type_size(int type)
 		fprintf(stderr, "Unknown bencode type: %d\n", type);
 		abort();
 	}
-	return 0;
 }
 
 static void *alloc(int type)
@@ -60,22 +68,55 @@ static void *alloc(int type)
 	return b;
 }
 
-static struct bencode *decode_bool(const char *data, size_t len, size_t *off)
+static int insufficient(struct decode *ctx)
+{
+	ctx->error = BEN_INSUFFICIENT;
+	return -1;
+}
+
+static int invalid(struct decode *ctx)
+{
+	ctx->error = BEN_INVALID;
+	return -1;
+}
+
+static void *insufficient_ptr(struct decode *ctx)
+{
+	ctx->error = BEN_INSUFFICIENT;
+	return NULL;
+}
+
+static void *invalid_ptr(struct decode *ctx)
+{
+	ctx->error = BEN_INVALID;
+	return NULL;
+}
+
+static void *oom_ptr(struct decode *ctx)
+{
+	ctx->error = BEN_NO_MEMORY;
+	return NULL;
+}
+
+static struct bencode *decode_bool(struct decode *ctx)
 {
 	struct bencode_bool *b;
 	char value;
 	char c;
-	if ((*off + 2) > len)
-		return NULL;
-	c = data[*off + 1];
+	if ((ctx->off + 2) > ctx->len)
+		return insufficient_ptr(ctx);
+
+	c = ctx->data[ctx->off + 1];
 	if (c != '0' && c != '1')
-		return NULL;
+		return invalid_ptr(ctx);
+
 	value = (c == '1');
 	b = alloc(BENCODE_BOOL);
 	if (b == NULL)
-		return NULL;
+		return oom_ptr(ctx);
+
 	b->b = value;
-	*off += 2;
+	ctx->off += 2;
 	return (struct bencode *) b;
 }
 
@@ -84,9 +125,8 @@ static int resize_dict(struct bencode_dict *d)
 	struct bencode **newkeys;
 	struct bencode **newvalues;
 	size_t newsize;
-	size_t maxalloc = ((size_t) -1) / sizeof(d->keys[0]) / 2;
 
-	if (d->alloc >= maxalloc)
+	if (d->alloc >= MAX_ALLOC)
 		return -1;
 
 	if (d->alloc == 0)
@@ -145,41 +185,44 @@ static int bencmpqsort(const void *a, const void *b)
 	return bencmp(akey, bkey);
 }
 
-static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
-				   int level)
+static struct bencode *decode_dict(struct decode *ctx)
 {
 	struct bencode *key;
 	struct bencode *value;
-	size_t newoff = *off + 1;
 	struct bencode_dict *d;
 
 	d = alloc(BENCODE_DICT);
 	if (d == NULL) {
 		fprintf(stderr, "bencode: Not enough memory for dict\n");
-		return NULL;
+		return oom_ptr(ctx);
 	}
 
-	while (newoff < len && data[newoff] != 'e') {
+	ctx->off += 1;
+
+	while (ctx->off < ctx->len && ctx->data[ctx->off] != 'e') {
 		if (d->n == d->alloc && resize_dict(d)) {
 			fprintf(stderr, "bencode: Can not resize dict\n");
+			ctx->error = BEN_NO_MEMORY;
 			goto error;
 		}
-		key = decode(data, len, &newoff, level);
+		key = decode(ctx);
 		if (key == NULL)
 			goto error;
 		if (key->type != BENCODE_INT && key->type != BENCODE_STR) {
 			ben_free(key);
 			key = NULL;
+			ctx->error = BEN_INVALID;
 			fprintf(stderr, "bencode: Invalid dict key type\n");
 			goto error;
 		}
 		if (d->n > 0 && bencmp(d->keys[d->n - 1], key) != -1) {
 			ben_free(key);
 			key = NULL;
+			ctx->error = BEN_INVALID;
 			goto error;
 		}
 
-		value = decode(data, len, &newoff, level);
+		value = decode(ctx);
 		if (value == NULL) {
 			ben_free(key);
 			key = NULL;
@@ -189,10 +232,12 @@ static struct bencode *decode_dict(const char *data, size_t len, size_t *off,
 		d->values[d->n] = value;
 		d->n++;
 	}
-	if (newoff >= len)
+	if (ctx->off >= ctx->len) {
+		ctx->error = BEN_INSUFFICIENT;
 		goto error;
+	}
 
-	*off = newoff + 1;
+	ctx->off += 1;
 
 	return (struct bencode *) d;
 
@@ -202,31 +247,32 @@ error:
 }
 
 /* off is the position of first number in */
-static int read_long_long(long long *ll, const char *data, size_t len,
-			  size_t *off, int c)
+static int read_long_long(long long *ll, struct decode *ctx, int c)
 {
 	char buf[LONGLONGSIZE]; /* fits all 64 bit integers */
 	size_t pos;
 	char *endptr;
 	size_t slen;
 
-	pos = find(data, len, *off, c);
+	pos = find(ctx->data, ctx->len, ctx->off, c);
 	if (pos == -1)
-		return -1;
-	slen = pos - *off;
+		return insufficient(ctx);
+
+	slen = pos - ctx->off;
 	if (slen == 0 || slen >= sizeof buf)
-		return -1;
+		return invalid(ctx);
+
 	assert(slen < sizeof buf);
-	memcpy(buf, data + *off, slen);
+	memcpy(buf, ctx->data + ctx->off, slen);
 	buf[slen] = 0;
 
 	if (buf[0] != '-' && !isdigit(buf[0]))
-		return -1;
+		return invalid(ctx);
 
 	errno = 0;
 	*ll = strtoll(buf, &endptr, 10);
 	if (errno == ERANGE || *endptr != 0)
-		return -1;
+		return invalid(ctx);
 
 	/*
 	 * Demand a unique encoding for all integers.
@@ -234,27 +280,25 @@ static int read_long_long(long long *ll, const char *data, size_t len,
 	 * Non-zero integers may not have leading zeros in the encoding.
 	 */
 	if (buf[0] == '-' && buf[1] == '0')
-		return -1;
-	if (buf[0] == '0' && pos != (*off + 1))
-		return -1;
+		return invalid(ctx);
+	if (buf[0] == '0' && pos != (ctx->off + 1))
+		return invalid(ctx);
 
-	*off = pos + 1;
-
+	ctx->off = pos + 1;
 	return 0;
 }
 
-static struct bencode *decode_int(const char *data, size_t len, size_t *off)
+static struct bencode *decode_int(struct decode *ctx)
 {
 	struct bencode_int *b;
 	long long ll;
-	size_t newoff = *off + 1;
-	if (read_long_long(&ll, data, len, &newoff, 'e'))
+	ctx->off += 1;
+	if (read_long_long(&ll, ctx, 'e'))
 		return NULL;
 	b = alloc(BENCODE_INT);
 	if (b == NULL)
-		return NULL;
+		return oom_ptr(ctx);
 	b->ll = ll;
-	*off = newoff;
 	return (struct bencode *) b;
 }
 
@@ -262,9 +306,8 @@ static int resize_list(struct bencode_list *list)
 {
 	struct bencode **newvalues;
 	size_t newsize;
-	size_t maxalloc = ((size_t) -1) / sizeof(list->values[0]) / 2;
 
-	if (list->alloc >= maxalloc)
+	if (list->alloc >= MAX_ALLOC)
 		return -1;
 
 	if (list->alloc == 0)
@@ -280,32 +323,31 @@ static int resize_list(struct bencode_list *list)
 	return 0;
 }
 
-static struct bencode *decode_list(const char *data, size_t len, size_t *off,
-				   int level)
+static struct bencode *decode_list(struct decode *ctx)
 {
-	struct bencode_list *l;
-	size_t newoff = *off + 1;
-
-	l = alloc(BENCODE_LIST);
+	struct bencode_list *l = alloc(BENCODE_LIST);
 	if (l == NULL)
-		return NULL;
+		return oom_ptr(ctx);
 
-	while (newoff < len && data[newoff] != 'e') {
-		struct bencode *b;
-		b = decode(data, len, &newoff, level);
+	ctx->off += 1;
+
+	while (ctx->off < ctx->len && ctx->data[ctx->off] != 'e') {
+		struct bencode *b = decode(ctx);
 		if (b == NULL)
 			goto error;
 		if (ben_list_append((struct bencode *) l, b)) {
 			ben_free(b);
+			ctx->error = BEN_NO_MEMORY;
 			goto error;
 		}
 	}
 
-	if (newoff >= len)
+	if (ctx->off >= ctx->len) {
+		ctx->error = BEN_INSUFFICIENT;
 		goto error;
+	}
 
-	*off = newoff + 1;
-
+	ctx->off += 1;
 	return (struct bencode *) l;
 
 error:
@@ -313,59 +355,51 @@ error:
 	return NULL;
 }
 
-static size_t read_size_t(const char *data, size_t len, size_t *off, int c)
+static size_t read_size_t(struct decode *ctx, int c)
 {
 	long long ll;
 	size_t s;
-	size_t newoff = *off;
-	if (read_long_long(&ll, data, len, &newoff, c))
+	if (read_long_long(&ll, ctx, c))
 		return -1;
 	if (ll < 0)
-		return -1;
+		return invalid(ctx);
 	/*
 	 * Test that information is not lost when converting from long long
 	 * to size_t
 	 */
 	s = (size_t) ll;
 	if (ll != (long long) s)
-		return -1;
-
-	*off = newoff;
+		return invalid(ctx);
 	return s;
 }
 
-static struct bencode *decode_str(const char *data, size_t len, size_t *off)
+static struct bencode *decode_str(struct decode *ctx)
 {
-	size_t datalen;
 	struct bencode *b;
-	size_t newoff = *off;
-
-	/* Read the string length */
-	datalen = read_size_t(data, len, &newoff, ':');
+	size_t datalen = read_size_t(ctx, ':'); /* Read the string length */
 	if (datalen == -1)
 		return NULL;
 
-	if ((newoff + datalen) > len)
-		return NULL;
+	if ((ctx->off + datalen) > ctx->len)
+		return insufficient_ptr(ctx);
 
 	/* Allocate string structure and copy data into it */
-	b = ben_blob(data + newoff, datalen);
-	if (b == NULL)
-		return NULL;
-	*off = newoff + datalen;
+	b = ben_blob(ctx->data + ctx->off, datalen);
+	ctx->off += datalen;
 	return b;
 }
 
-static struct bencode *decode(const char *data, size_t len, size_t *off,
-			      int level)
+static struct bencode *decode(struct decode *ctx)
 {
-	level++;
-	if (level > 256)
-		return NULL;
-	if (*off == len)
-		return NULL;
-	assert (*off < len);
-	switch (data[*off]) {
+	ctx->level++;
+	if (ctx->level > 256)
+		return invalid_ptr(ctx);
+
+	if (ctx->off == ctx->len)
+		return insufficient_ptr(ctx);
+
+	assert (ctx->off < ctx->len);
+	switch (ctx->data[ctx->off]) {
 	case '0':
 	case '1':
 	case '2':
@@ -376,37 +410,41 @@ static struct bencode *decode(const char *data, size_t len, size_t *off,
 	case '7':
 	case '8':
 	case '9':
-		return decode_str(data, len, off);
+		return decode_str(ctx);
 	case 'b':
-		return decode_bool(data, len, off);
+		return decode_bool(ctx);
 	case 'd':
-		return decode_dict(data, len, off, level);
+		return decode_dict(ctx);
 	case 'i':
-		return decode_int(data, len, off);
+		return decode_int(ctx);
 	case 'l':
-		return decode_list(data, len, off, level);
+		return decode_list(ctx);
 	default:
-		return NULL;
+		return invalid_ptr(ctx);
 	}
 }
 
 struct bencode *ben_decode(const void *data, size_t len)
 {
-	struct bencode *b;
-	size_t off = 0;
-	b = decode((const char *) data, len, &off, 0);
-	if (b == NULL)
-		return NULL;
-	if (off != len) {
+	struct decode ctx = {.data = data, .len = len};
+	struct bencode *b = decode(&ctx);
+	if (b != NULL && ctx.off != len) {
 		ben_free(b);
 		return NULL;
 	}
 	return b;
 }
 
-struct bencode *ben_decode2(const void *data, size_t len, size_t *off)
+struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *error)
 {
-	return decode((const char *) data, len, off, 0);
+	struct decode ctx = {.data = data, .len = len, .off = *off};
+	struct bencode *b = decode(&ctx);
+	*off = ctx.off;
+	if (error != NULL) {
+		assert((b != NULL) ^ (ctx.error != 0));
+		*error = ctx.error;
+	}
+	return b;
 }
 
 static void free_dict(struct bencode_dict *d)

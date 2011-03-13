@@ -24,19 +24,25 @@ static void booltest(const char *s, size_t len, int expected, int success)
 	ben_free((struct bencode *) b);
 }
 
-static void inttest(const char *s, size_t len, long long expected, int success)
+static void inttest(const char *s, size_t len, long long expected, int expcode)
 {
 	struct bencode_int *b;
-	b = (struct bencode_int *) ben_decode(s, len);
-	if (success && b == NULL) {
+	size_t off = 0;
+	int error;
+	b = (struct bencode_int *) ben_decode2(s, len, &off, &error);
+	if (error != expcode) {
+		fprintf(stderr, "%s/%zd should get code %d but got %d\n", s, len, expcode, error);
+		exit(1);
+	}
+	if (expcode == BEN_OK && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && b->ll != expected) {
+	if (expcode == BEN_OK && b->ll != expected) {
 		fprintf(stderr, "%s/%zd should have value %lld\n", s, len, expected);
 		exit(1);
 	}
-	if (!success && b != NULL) {
+	if (expcode != BEN_OK && b != NULL) {
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
@@ -300,13 +306,13 @@ int main(void)
 	booltest("b1", 2, 1, 1);
 	booltest("b2", 2, 1, 0);
 
-	inttest("i-1e", 4, -1, 1);
-	inttest("i-1e", 3, -1, 0);
-	inttest("i0e", 3, 0, 1);
-	inttest("i1e", 3, 1, 1);
-	inttest("ie", 2, 0, 0);
-	inttest("i1ke", 4, 1, 0);
-	inttest("i123456789e", 11, 123456789, 1);
+	inttest("i-1e", 4, -1, BEN_OK);
+	inttest("i-1e", 3, -1, BEN_INSUFFICIENT);
+	inttest("i0e", 3, 0, BEN_OK);
+	inttest("i1e", 3, 1, BEN_OK);
+	inttest("ie", 2, 0, BEN_INVALID);
+	inttest("i1ke", 4, 1, BEN_INVALID);
+	inttest("i123456789e", 11, 123456789, BEN_OK);
 
 	strtest("0:", 2, "", 1);
 	strtest("7:marklar", 9, "marklar", 1);

@@ -11,7 +11,16 @@ enum {
 	BENCODE_STR,
 };
 
-struct bencode;
+enum {
+	BEN_OK = 0, /* No errors. Set to zero. Non-zero implies an error. */
+	BEN_INVALID,      /* Invalid data was given to decoder */
+	BEN_INSUFFICIENT, /* Insufficient amount of data for decoding */
+	BEN_NO_MEMORY,    /* Memory allocation failed */
+};
+
+struct bencode {
+	char type;
+};
 
 struct bencode_bool {
 	char type;
@@ -45,12 +54,8 @@ struct bencode_str {
 	char *s;
 };
 
-struct bencode {
-	char type;
-};
-
 struct bencode *ben_decode(const void *data, size_t len);
-struct bencode *ben_decode2(const void *data, size_t len, size_t *off);
+struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *error);
 size_t ben_encoded_size(const struct bencode *b);
 void *ben_encode(size_t *len, const struct bencode *b);
 size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b);
