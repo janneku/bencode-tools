@@ -137,10 +137,10 @@ struct bencode *ben_list(void);
 int ben_list_append(struct bencode *list, struct bencode *b);
 
 /*
- * Create a Python formatted string representation of 'b'
- *
- * Returned data is null terminated, but size_t '*len' does not include the
- * null termination byte.
+ * Returns a Python formatted C string representation of 'b'. The returned
+ * string should be freed with free().
+ * The returned data is terminated with '\0'.
+ * The length of the string without '\0' byte is copied to '*len'.
  */
 char *ben_print(size_t *len, const struct bencode *b);
 
