@@ -605,12 +605,22 @@ static int print(char *data, size_t size, size_t *pos, const struct bencode *b)
 		if (putonechar(data, size, pos, '\''))
 			return -1;
 		for (i = 0; i < s->len; i++) {
-			if (isprint(s->s[i])) {
-				if (putonechar(data, size, pos, s->s[i]))
-					return -1;
-			} else {
+			if (!isprint(s->s[i])) {
 				if (puthexchar(data, size, pos, s->s[i]))
 					return -1;
+				continue;
+			}
+
+			switch (s->s[i]) {
+			case '\'':
+			case '\\':
+				/* Need escape character */
+				if (putonechar(data, size, pos, '\\'))
+					return -1;
+			default:
+				if (putonechar(data, size, pos, s->s[i]))
+					return -1;
+				break;
 			}
 		}
 		return putonechar(data, size, pos, '\'');
@@ -664,10 +674,19 @@ static size_t get_printed_size(const struct bencode *b)
 		s = ben_str_const_cast(b);
 		size += 1; /* ' */
 		for (pos = 0; pos < s->len; pos++) {
-			if (isprint(s->s[pos]))
-				size += 1;
-			else
+			if (!isprint(s->s[pos])) {
 				size += 4; /* "\xDD" */
+				continue;
+			}
+			switch (s->s[pos]) {
+			case '\'':
+			case '\\':
+				size += 2; /* escaped characters */
+				break;
+			default:
+				size += 1;
+				break;
+			}
 		}
 		size += 1; /* ' */
 		return size;
@@ -965,8 +984,7 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	return 0;
 }
 
-/* The returned string is null terminated */
-void *ben_print(size_t *len, const struct bencode *b)
+char *ben_print(size_t *len, const struct bencode *b)
 {
 	size_t size = get_printed_size(b);
 	char *data = malloc(size + 1);

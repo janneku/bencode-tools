@@ -136,8 +136,13 @@ struct bencode *ben_list(void);
  */
 int ben_list_append(struct bencode *list, struct bencode *b);
 
-/* Create a Python formatted string representation of 'b' */
-void *ben_print(size_t *len, const struct bencode *b);
+/*
+ * Create a Python formatted string representation of 'b'
+ *
+ * Returned data is null terminated, but size_t '*len' does not include the
+ * null termination byte.
+ */
+char *ben_print(size_t *len, const struct bencode *b);
 
 /* Create a string from C string (note bencode string may contain '\0'. */
 struct bencode *ben_str(const char *s);
