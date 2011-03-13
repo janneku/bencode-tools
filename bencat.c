@@ -68,14 +68,12 @@ static int reallocarray(char **buf, size_t *size)
 
 static int process_object(const struct bencode *b)
 {
-	size_t len;
 	char *s;
 	size_t ret;
 	FILE *f = teemode ? stderr : stdout;
-	s = ben_print(&len, b);
+	s = ben_print(b);
 	if (s == NULL)
 		return -1;
-	assert(len > 0);
 	if (fprintf(f, "%s\n", s) == (strlen(s) + 1))
 		ret = 0;
 	else

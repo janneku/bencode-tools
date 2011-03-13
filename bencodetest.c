@@ -170,7 +170,6 @@ static void print_tests(void)
 
 	size_t i;
 	char *printed;
-	size_t s;
 	struct bencode *b;
 
 	for (i = 0; table[i].encoded != NULL; i++) {
@@ -184,7 +183,7 @@ static void print_tests(void)
 			fprintf(stderr, "Failed to decode: %s\n", encoded);
 			exit(1);
 		}
-		printed = ben_print(&s, b);
+		printed = ben_print(b);
 		if (printed == NULL) {
 			fprintf(stderr, "Failed to print: %s\n", expected);
 			exit(1);

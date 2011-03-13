@@ -984,20 +984,20 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	return 0;
 }
 
-char *ben_print(size_t *len, const struct bencode *b)
+char *ben_print(const struct bencode *b)
 {
 	size_t size = get_printed_size(b);
 	char *data = malloc(size + 1);
+	size_t len = 0;
 	if (data == NULL) {
 		fprintf(stderr, "bencode: No memory to print\n");
 		return NULL;
 	}
-	*len = 0;
-	if (print(data, size, len, b)) {
+	if (print(data, size, &len, b)) {
 		free(data);
 		return NULL;
 	}
-	assert(*len == size);
+	assert(len == size);
 	data[size] = 0;
 	return data;
 }
