@@ -5,101 +5,125 @@
 #include <stdio.h>
 #include <string.h>
 
-static void booltest(const char *s, size_t len, int expected, int success)
+static void booltest(const char *s, size_t len, int expected, int experror)
 {
 	struct bencode_bool *b;
-	b = (struct bencode_bool *) ben_decode(s, len);
-	if (success && b == NULL) {
+	size_t off = 0;
+	int error;
+	b = (struct bencode_bool *) ben_decode2(s, len, &off, &error);
+	if (experror != error) {
+		fprintf(stderr, "%s/%zd should got code %d but got %d\n", s, len, experror, error);
+		exit(1);
+	}
+	if (experror == BEN_OK && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && b->b != expected) {
+	if (experror == BEN_OK && b->b != expected) {
 		fprintf(stderr, "%s/%zd should have value %d\n", s, len, expected);
 		exit(1);
 	}
-	if (!success && b != NULL) {
+	if (experror != BEN_OK && b != NULL) {
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
 	ben_free((struct bencode *) b);
 }
 
-static void inttest(const char *s, size_t len, long long expected, int expcode)
+static void inttest(const char *s, size_t len, long long expected, int experror)
 {
 	struct bencode_int *b;
 	size_t off = 0;
 	int error;
 	b = (struct bencode_int *) ben_decode2(s, len, &off, &error);
-	if (error != expcode) {
-		fprintf(stderr, "%s/%zd should get code %d but got %d\n", s, len, expcode, error);
+	if (error != experror) {
+		fprintf(stderr, "%s/%zd should get code %d but got %d\n", s, len, experror, error);
 		exit(1);
 	}
-	if (expcode == BEN_OK && b == NULL) {
+	if (experror == BEN_OK && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (expcode == BEN_OK && b->ll != expected) {
+	if (experror == BEN_OK && b->ll != expected) {
 		fprintf(stderr, "%s/%zd should have value %lld\n", s, len, expected);
 		exit(1);
 	}
-	if (expcode != BEN_OK && b != NULL) {
+	if (experror != BEN_OK && b != NULL) {
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
 	ben_free((struct bencode *) b);
 }
 
-static void strtest(const char *s, size_t len, const char *expected, int success)
+static void strtest(const char *s, size_t len, const char *expected, int experror)
 {
 	struct bencode_str *b;
-	b = (struct bencode_str *) ben_decode(s, len);
-	if (success && b == NULL) {
+	size_t off = 0;
+	int error;
+	b = (struct bencode_str *) ben_decode2(s, len, &off, &error);
+	if (error != experror) {
+		fprintf(stderr, "%s/%zd should get code %d but got %d\n", s, len, experror, error);
+		exit(1);
+	}
+	if (experror == BEN_OK && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && memcmp(b->s, expected, strlen(expected)) != 0) {
+	if (experror == BEN_OK && memcmp(b->s, expected, strlen(expected)) != 0) {
 		fprintf(stderr, "%s/%zd should have value %s\n", s, len, expected);
 		exit(1);
 	}
-	if (!success && b != NULL) {
+	if (experror != BEN_OK && b != NULL) {
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
 	ben_free((struct bencode *) b);
 }
 
-static void listtest(const char *s, size_t len, size_t expected, int success)
+static void listtest(const char *s, size_t len, size_t expected, int experror)
 {
 	struct bencode_list *b;
-	b = (struct bencode_list *) ben_decode(s, len);
-	if (success && b == NULL) {
+	size_t off = 0;
+	int error;
+	b = (struct bencode_list *) ben_decode2(s, len, &off, &error);
+	if (error != experror) {
+		fprintf(stderr, "%s/%zd should get code %d but got %d\n", s, len, experror, error);
+		exit(1);
+	}
+	if (experror == BEN_OK && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && b->n != expected) {
+	if (experror == BEN_OK && b->n != expected) {
 		fprintf(stderr, "%s/%zd should have %zu entries\n", s, len, expected);
 		exit(1);
 	}
-	if (!success && b != NULL) {
+	if (experror != BEN_OK && b != NULL) {
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
 	ben_free((struct bencode *) b);
 }
 
-static void dicttest(const char *s, size_t len, size_t expected, int success)
+static void dicttest(const char *s, size_t len, size_t expected, int experror)
 {
 	struct bencode_dict *b;
-	b = (struct bencode_dict *) ben_decode(s, len);
-	if (success && b == NULL) {
+	size_t off = 0;
+	int error;
+	b = (struct bencode_dict *) ben_decode2(s, len, &off, &error);
+	if (error != experror) {
+		fprintf(stderr, "%s/%zd should get code %d but got %d\n", s, len, experror, error);
+		exit(1);
+	}
+	if (experror == BEN_OK && b == NULL) {
 		fprintf(stderr, "%s/%zd should have succeeded\n", s, len);
 		exit(1);
 	}
-	if (success && b->n != expected) {
+	if (experror == BEN_OK && b->n != expected) {
 		fprintf(stderr, "%s/%zd should have %zu entries\n", s, len, expected);
 		exit(1);
 	}
-	if (!success && b != NULL) {
+	if (experror != BEN_OK && b != NULL) {
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
@@ -300,11 +324,13 @@ static void misctests(void)
 
 int main(void)
 {
-	booltest("b0", 1, 0, 0);
-	booltest("b0", 2, 0, 1);
-	booltest("b0 ", 3, 0, 0);
-	booltest("b1", 2, 1, 1);
-	booltest("b2", 2, 1, 0);
+	assert(ben_decode("i0e ", 4) == NULL);
+
+	booltest("b0", 1, 0, BEN_INSUFFICIENT);
+	booltest("b0", 2, 0, BEN_OK);
+	booltest("b0 ", 3, 0, BEN_OK);
+	booltest("b1", 2, 1, BEN_OK);
+	booltest("b2", 2, 1, BEN_INVALID);
 
 	inttest("i-1e", 4, -1, BEN_OK);
 	inttest("i-1e", 3, -1, BEN_INSUFFICIENT);
@@ -314,24 +340,40 @@ int main(void)
 	inttest("i1ke", 4, 1, BEN_INVALID);
 	inttest("i123456789e", 11, 123456789, BEN_OK);
 
-	strtest("0:", 2, "", 1);
-	strtest("7:marklar", 9, "marklar", 1);
-	strtest("7:marklar", 8, "marklar", 0);
+	strtest("0", 1, "", BEN_INSUFFICIENT);
+	strtest("0:", 1, "", BEN_INSUFFICIENT);
+	strtest("0:", 2, "", BEN_OK);
+	strtest("0e", 2, "", BEN_INSUFFICIENT);
+	strtest("0e:", 3, "", BEN_INVALID);
+	strtest("7:marklar", 9, "marklar", BEN_OK);
+	strtest("7:marklar", 8, "marklar", BEN_INSUFFICIENT);
 
-	listtest("le", 2, 0, 1);
-	listtest("li0ee", 5, 1, 1);
-	listtest("li0ei0ee", 8, 2, 1);
-	listtest("li0ei0ei0ee", 11, 3, 1);
-	listtest("li0ei0ei0ei0ee", 14, 4, 1);
-	listtest("li0ei0ei0ei0ei0ee", 17, 5, 1);
-	listtest("l7:marklare", 11, 1, 1);
-	listtest("l7:marklari0ee", 14, 2, 1);
-	listtest("l7:marklarf", 11, 1, 0);
+	listtest("le", 2, 0, BEN_OK);
+	listtest("lfe", 3, 0, BEN_INVALID);
+	listtest("li0ee", 5, 1, BEN_OK);
+	listtest("li0e", 4, 1, BEN_INSUFFICIENT);
+	listtest("li0ei", 5, 1, BEN_INSUFFICIENT);
+	listtest("li0ei1", 6, 1, BEN_INSUFFICIENT);
+	listtest("li0ei1e", 7, 1, BEN_INSUFFICIENT);
+	listtest("li0ei", 5, 1, BEN_INSUFFICIENT);
+	listtest("li0ef", 5, 1, BEN_INVALID);
+	listtest("li0ei0ee", 8, 2, BEN_OK);
+	listtest("li0ei0ei0ee", 11, 3, BEN_OK);
+	listtest("li0ei0ei0ei0ee", 14, 4, BEN_OK);
+	listtest("li0ei0ei0ei0ei0ee", 17, 5, BEN_OK);
+	listtest("l7:marklare", 11, 1, BEN_OK);
+	listtest("l7:marklari0ee", 14, 2, BEN_OK);
+	listtest("l7:marklarf", 11, 1, BEN_INVALID);
 
-	dicttest("di0e7:marklare", 14, 1, 1);
-	dicttest("di0e7:marklare", 13, 1, 0);
-	dicttest("di0e7:marklari1e7:marklare", 26, 2, 1);
-	dicttest("de", 2, 0, 1);
+	dicttest("d", 1, 1, BEN_INSUFFICIENT);
+	dicttest("di0e7:marklare", 14, 1, BEN_OK);
+	dicttest("di0e", 4, 1, BEN_INSUFFICIENT);
+	dicttest("di0e7", 5, 1, BEN_INSUFFICIENT);
+	dicttest("di0e7:", 6, 1, BEN_INSUFFICIENT);
+	dicttest("di0e7:marklar", 13, 1, BEN_INSUFFICIENT);
+	dicttest("di0e7:marklare", 13, 1, BEN_INSUFFICIENT);
+	dicttest("di0e7:marklari1e7:marklare", 26, 2, BEN_OK);
+	dicttest("de", 2, 0, BEN_OK);
 
 	encoded_size_tests();
 
