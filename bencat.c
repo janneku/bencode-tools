@@ -199,6 +199,25 @@ static int process_files(int i, int argc, char *argv[])
 	return 0;
 }
 
+static void print_help(void)
+{
+	printf(
+"bencat - print bencoded objects on the standard output\n"
+"\n"
+"bencat [--help] [--tee] [FILE]...\n"
+"\n"
+"bencat reads input from stdin if no input files are given. Otherwise the files\n"
+"are read in order. Each file is interpreted as a sequence of bencoded objects.\n"
+"Object are decoded and printed.\n"
+"\n"
+"OPTIONS:\n"
+"\n"
+"-h/--help, prints this text\n"
+"-t/--tee,  copy stream directly from file to stdout and print a decoded copy\n"
+"           on stderr\n"
+		);
+}
+
 int main(int argc, char *argv[])
 {
 	int i;
@@ -215,6 +234,11 @@ int main(int argc, char *argv[])
 			teemode = 1;
 			i++;
 			continue;
+		}
+		if (strcmp(argv[i], "-h") == 0 ||
+		    strcmp(argv[i], "--help") == 0) {
+			print_help();
+			exit(0);
 		}
 		fprintf(stderr, "bencat: Unknown option: %s\n", argv[i]);
 		exit(1);
