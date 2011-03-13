@@ -29,6 +29,7 @@ install:
 	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/bencodetools" "$(PREFIX)/bin"
 	install -m 644 include/bencodetools/*.h "$(PREFIX)/include/bencodetools/"
 	install -m 644 libbencodetools.so "$(PREFIX)/lib/"
+	install bencat "$(PREFIX)/bin/"
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $<
