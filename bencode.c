@@ -988,3 +988,20 @@ struct bencode *ben_str(const char *s)
 {
 	return ben_blob(s, strlen(s));
 }
+
+const char *ben_strerror(int error)
+{
+	switch (error) {
+	case BEN_OK:
+		return "OK (no error)";
+	case BEN_INVALID:
+		return "Invalid data";
+	case BEN_INSUFFICIENT:
+		return "Insufficient amount of data (need more data)";
+	case BEN_NO_MEMORY:
+		return "Out of memory";
+	default:
+		fprintf(stderr, "Unknown error code: %d\n", error);
+		return NULL;
+	}
+}
