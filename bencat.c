@@ -12,6 +12,8 @@
 
 static int teemode;
 
+#define BUFFER_SIZE 4096
+
 /*
  * xread() is the same as the read(), but it automatically restarts read()
  * operations with a recoverable error (EAGAIN and EINTR). xread()
@@ -32,7 +34,7 @@ static size_t xfwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t ret;
 	size_t written = 0;
-	char *writeptr = (char *) ptr;
+	const char *writeptr = ptr;
 
 	while (written < nmemb) {
 		ret = fwrite(writeptr, size, nmemb - written, stream);
@@ -47,14 +49,11 @@ static size_t xfwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
 static int reallocarray(char **buf, size_t *size)
 {
-	size_t newsize;
+	size_t newsize = BUFFER_SIZE;
 	char *p;
-	if (*buf == NULL) {
-		newsize = 4096;
-	} else {
-		newsize = *size;
-		if (newsize == 0)
-			newsize = 4096;
+	if (*buf != NULL) {
+		if (*size > 0)
+			newsize = *size;
 		if (newsize >= (((size_t) - 1) / 2))
 			return -1;
 		newsize *= 2;
@@ -70,15 +69,20 @@ static int reallocarray(char **buf, size_t *size)
 static int process_object(const struct bencode *b)
 {
 	size_t len;
-	void *s;
+	char *s;
 	size_t ret;
+	FILE *f = teemode ? stderr : stdout;
 	s = ben_print(&len, b);
 	if (s == NULL)
 		return -1;
 	assert(len > 0);
-	ret = xfwrite(s, 1, len, stderr);
+	if (fprintf(f, "%s\n", s) == (strlen(s) + 1))
+		ret = 0;
+	else
+		ret = -1;
+	fflush(f);
 	free(s);
-	return (ret == len) ? 0 : -1;
+	return ret;
 }
 
 static void shift_buffer(char *buf, size_t *size, size_t off)
@@ -86,6 +90,18 @@ static void shift_buffer(char *buf, size_t *size, size_t off)
 	assert(off <= *size);
 	memmove(buf, buf + off, *size - off);
 	*size -= off;
+}
+
+static int process_buffer(char *buf, size_t *size, size_t len)
+{
+	if (teemode) {
+		if (xfwrite(buf, 1, len, stdout) < len)
+			return -1;
+		fflush(stdout);
+	}
+
+	shift_buffer(buf, size, len);
+	return 0;
 }
 
 static int process(int fd)
@@ -100,13 +116,17 @@ static int process(int fd)
 	struct bencode *b;
 
 	while (1) {
-		if ((alloc - size) == 0 && reallocarray(&buf, &alloc))
+		if ((alloc - size) == 0 && reallocarray(&buf, &alloc)) {
+			fprintf(stderr, "bencat: Out of memory\n");
 			goto error;
+		}
 
 		if (needmore) {
 			ret = xread(fd, buf + size, alloc - size);
-			if (ret < 0)
+			if (ret < 0) {
+				fprintf(stderr, "bencat: Unexpected error in data stream (%s)\n", strerror(errno));
 				goto error;
+			}
 			if (ret == 0)
 				break;
 			size += ret;
@@ -125,11 +145,12 @@ static int process(int fd)
 		}
 
 		assert(off > 0);
-		shift_buffer(buf, &size, off);
 
-		ret = process_object(b);
+		ret = process_buffer(buf, &size, off) | process_object(b);
+
 		ben_free(b);
 		b = NULL;
+
 		if (ret)
 			goto error;
 	}
