@@ -124,6 +124,9 @@ struct bencode *ben_dict_pop(struct bencode *d, const struct bencode *key);
  */
 int ben_dict_set(struct bencode *d, struct bencode *key, struct bencode *value);
 
+/* Same as ben_dict_set(), but the key is a C string */
+int ben_dict_set_by_str(struct bencode *d, const char *key, struct bencode *value);
+
 struct bencode *ben_int(long long ll);
 
 /* Create an empty list */
