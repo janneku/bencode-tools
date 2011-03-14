@@ -970,6 +970,23 @@ int ben_dict_set_by_str(struct bencode *dict, const char *key, struct bencode *v
 	return 0;
 }
 
+int ben_dict_set_str_by_str(struct bencode *dict, const char *key, const char *value)
+{
+	struct bencode *bkey = ben_str(key);
+	struct bencode *bvalue = ben_str(value);
+	if (bkey == NULL || bvalue == NULL) {
+		ben_free(bkey);
+		ben_free(bvalue);
+		return -1;
+	}
+	if (ben_dict_set(dict, bkey, bvalue)) {
+		ben_free(bkey);
+		ben_free(bvalue);
+		return -1;
+	}
+	return 0;
+}
+
 struct bencode *ben_int(long long ll)
 {
 	struct bencode_int *b = alloc(BENCODE_INT);
