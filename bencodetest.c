@@ -266,7 +266,7 @@ static void testvectors(const char **vec, int success)
 	}
 }
 
-static void misctests(void)
+static void misc_tests(void)
 {
 	const char *validvectors[] = {
 		"i4e",
@@ -320,6 +320,20 @@ static void misctests(void)
 	       };
 	testvectors(validvectors, 1);
 	testvectors(invalidvectors, 0);
+}
+
+static void dict_tests(void)
+{
+	struct bencode *d = ben_dict();
+	struct bencode *i = ben_int(0);
+	struct bencode *key2 = ben_str("key2");
+	struct bencode *i2 = ben_int(0);
+
+	assert(d != NULL && i != NULL && key2 != NULL && i2 != NULL);
+	assert(ben_dict_set_by_str(d, "key", i) == 0);
+	assert(ben_dict_get_by_str(d, "key") != NULL);
+	assert(ben_dict_set(d, key2, i2) == 0);
+	assert(ben_dict_get(d, key2) != NULL);
 }
 
 int main(void)
@@ -377,9 +391,11 @@ int main(void)
 
 	encoded_size_tests();
 
-	misctests();
+	misc_tests();
 
 	print_tests();
+
+	dict_tests();
 
 	return 0;
 }

@@ -77,6 +77,20 @@ struct bencode *ben_decode(const void *data, size_t len);
  */
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *error);
 
+/*
+ * ben_cmp() is similar to strcmp(), but compares both integers and strings.
+ * An integer is always less than a string.
+ *
+ * ben_cmp(a, b) returns -1 if a < b, 0 if a == b, and 1 if a > b.
+ */
+int ben_cmp(const struct bencode *a, const struct bencode *b);
+
+/*
+ * Comparison function suitable for qsort(). Uses ben_cmp(), so this can be
+ * used to order both integer and string arrays.
+ */
+int ben_cmp_qsort(const void *a, const void *b);
+
 /* Get the serialization size of bencode structure 'b' */
 size_t ben_encoded_size(const struct bencode *b);
 
@@ -106,6 +120,8 @@ struct bencode *ben_dict(void);
  * Returns NULL if the key does not exist.
  */
 struct bencode *ben_dict_get(const struct bencode *d, const struct bencode *key);
+
+struct bencode *ben_dict_get_by_str(const struct bencode *d, const char *key);
 
 /*
  * Try to locate 'key' in dictionary. Returns the associated value, if found.

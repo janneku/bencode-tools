@@ -147,7 +147,7 @@ static int resize_dict(struct bencode_dict *d)
 	return 0;
 }
 
-static int bencmp(const struct bencode *a, const struct bencode *b)
+int ben_cmp(const struct bencode *a, const struct bencode *b)
 {
 	size_t cmplen;
 	int ret;
@@ -178,11 +178,11 @@ static int bencmp(const struct bencode *a, const struct bencode *b)
 	return (sa->len < sb->len) ? -1 : 1;
 }
 
-static int bencmpqsort(const void *a, const void *b)
+int ben_cmp_qsort(const void *a, const void *b)
 {
 	const struct bencode *akey = ((const struct bencode_keyvalue *) a)->key;
 	const struct bencode *bkey = ((const struct bencode_keyvalue *) b)->key;
-	return bencmp(akey, bkey);
+	return ben_cmp(akey, bkey);
 }
 
 static struct bencode *decode_dict(struct decode *ctx)
@@ -215,7 +215,7 @@ static struct bencode *decode_dict(struct decode *ctx)
 			fprintf(stderr, "bencode: Invalid dict key type\n");
 			goto error;
 		}
-		if (d->n > 0 && bencmp(d->keys[d->n - 1], key) != -1) {
+		if (d->n > 0 && ben_cmp(d->keys[d->n - 1], key) != -1) {
 			ben_free(key);
 			key = NULL;
 			ctx->error = BEN_INVALID;
@@ -559,7 +559,7 @@ static int print(char *data, size_t size, size_t *pos, const struct bencode *b)
 			pairs[i].key = dict->keys[i];
 			pairs[i].value = dict->values[i];
 		}
-		qsort(pairs, dict->n, sizeof(pairs[0]), bencmpqsort);
+		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
 		for (i = 0; i < dict->n; i++) {
 			if (print(data, size, pos, pairs[i].key))
@@ -730,7 +730,7 @@ static int serialize(char *data, size_t size, size_t *pos,
 			pairs[i].key = dict->keys[i];
 			pairs[i].value = dict->values[i];
 		}
-		qsort(pairs, dict->n, sizeof(pairs[0]), bencmpqsort);
+		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
 		for (i = 0; i < dict->n; i++) {
 			if (serialize(data, size, pos, pairs[i].key))
@@ -913,7 +913,25 @@ struct bencode *ben_dict_get(const struct bencode *dict, const struct bencode *k
 	const struct bencode_dict *d = ben_dict_const_cast(dict);
 	size_t pos;
 	for (pos = 0; pos < d->n; pos++) {
-		if (bencmp(d->keys[pos], key) == 0)
+		if (ben_cmp(d->keys[pos], key) == 0)
+			return d->values[pos];
+	}
+	return NULL;
+}
+
+struct bencode *ben_dict_get_by_str(const struct bencode *dict, const char *key)
+{
+	const struct bencode_dict *d = ben_dict_const_cast(dict);
+	size_t keylen = strlen(key);
+	struct bencode_str *dkey;
+	size_t pos;
+	for (pos = 0; pos < d->n; pos++) {
+		dkey = ben_str_cast(d->keys[pos]);
+		if (dkey == NULL)
+			continue;
+		if (dkey->len != keylen)
+			continue;
+		if (strcmp(dkey->s, key) == 0)
 			return d->values[pos];
 	}
 	return NULL;
@@ -930,7 +948,7 @@ struct bencode *ben_dict_pop(struct bencode *dict, const struct bencode *key)
 	struct bencode_dict *d = ben_dict_cast(dict);
 	size_t pos;
 	for (pos = 0; pos < d->n; pos++) {
-		if (bencmp(d->keys[pos], key) == 0) {
+		if (ben_cmp(d->keys[pos], key) == 0) {
 			struct bencode *value = d->values[pos];
 			ben_free(d->keys[pos]);
 			replacewithlast(d->keys, pos, d->n);
