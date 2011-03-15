@@ -1013,6 +1013,17 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	return 0;
 }
 
+void ben_list_set(struct bencode *list, size_t i, struct bencode *b)
+{
+	struct bencode_list *l = ben_list_cast(list);
+	if (i >= l->n) {
+		fprintf(stderr, "bencode: ben_list_set() out of bounds: %zu\n", i);
+		abort();
+	}
+	ben_free(l->values[i]);
+	l->values[i] = b;
+}
+
 char *ben_print(const struct bencode *b)
 {
 	size_t size = get_printed_size(b);

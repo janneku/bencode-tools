@@ -246,6 +246,23 @@ static inline size_t ben_list_len(const struct bencode *b)
 	return ben_list_const_cast(b)->n;
 }
 
+/*
+ * ben_list_get(list, i) returns object at position i in list,
+ * or NULL if position i is out of bounds.
+ */
+static inline struct bencode *ben_list_get(const struct bencode *list, size_t i)
+{
+	const struct bencode_list *l = ben_list_const_cast(list);
+	return i < l->n ? l->values[i] : NULL;
+}
+
+/*
+ * ben_list_set(list, i, b) sets object b to list at position i.
+ * The old value at position i is freed.
+ * The program aborts if position i is out of bounds.
+ */
+void ben_list_set(struct bencode *list, size_t i, struct bencode *b);
+
 /* Return the number of bytes in a string 'b' */
 static inline size_t ben_str_len(const struct bencode *b)
 {
