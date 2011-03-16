@@ -22,6 +22,9 @@ for opt in "$@" ; do
 		echo "                       but copy files to 'dest/prefix' on make install"
 		exit
 		;;
+	*)
+		echo "Unknown configure option: $opt"
+		exit 1
 	esac
 done
 
