@@ -207,6 +207,7 @@ static void encoded_size_tests(void)
 	char data[4096];
 	size_t s;
 	size_t pos;
+	size_t n;
 
 	assert(ben_encoded_size(ben_bool(0)) == 2);
 	assert(ben_encoded_size(ben_bool(1)) == 2);
@@ -226,9 +227,13 @@ static void encoded_size_tests(void)
 	ben_list_append(l, ben_str("marklar"));
 	assert(ben_encoded_size(l) == 14);
 	s = 0;
-	ben_list_for_each(b, pos, l)
+	n = 0;
+	ben_list_for_each(b, pos, l) {
 		s += ben_encoded_size(b);
+		n++;
+	}
 	assert(s == 12);
+	assert(n == 2);
 	ben_free(l);
 	l = NULL;
 
@@ -237,15 +242,19 @@ static void encoded_size_tests(void)
 	ben_dict_set(d, ben_int(1), ben_str(""));
 	ben_dict_set(d, ben_int(0), ben_str(""));
 	ben_dict_set(d, ben_int(0), ben_str(""));
+	assert(ben_dict_len(d) == 2);
 	s = ben_encode2(data, sizeof data, d);
 	assert(s == 12);
 	assert(memcmp(data, "di0e0:i1e0:e", s) == 0);
 	s = 0;
+	n = 0;
 	ben_dict_for_each(key, value, pos, d) {
 		s += ben_encoded_size(key);
 		s += ben_encoded_size(value);
+		n++;
 	}
 	assert(s == 10);
+	assert(n == 2);
 	ben_free(d);
 }
 

@@ -313,7 +313,7 @@ static inline const char *ben_str_val(const struct bencode *b)
  * pos is a size_t.
  */
 #define ben_list_for_each(b, pos, l) \
-	for ((pos) = 0; (b) = ((const struct bencode_list *) (l))->values[(pos)], (pos) < ((const struct bencode_list *) (l))->n; (pos)++)
+	for ((pos) = 0; (pos) < ((const struct bencode_list *) (l))->n && ((b) = ((const struct bencode_list *) (l))->values[(pos)]) != NULL ; (pos)++)
 
 /*
  * ben_dict_for_each() is an iterator macro for bencoded dictionaries.
@@ -321,6 +321,6 @@ static inline const char *ben_str_val(const struct bencode *b)
  * pos is a size_t.
  */
 #define ben_dict_for_each(key, value, pos, d) \
-	for ((pos) = 0; (key) = ((const struct bencode_dict *) (d))->keys[(pos)], (value) = ((const struct bencode_dict *) (d))->values[(pos)], (pos) < ((const struct bencode_dict *) (d))->n; (pos)++)
+	for ((pos) = 0; (pos) < ((const struct bencode_dict *) (d))->n && ((key) = ((const struct bencode_dict *) (d))->keys[(pos)]) != NULL && ((value) = ((const struct bencode_dict *) (d))->values[(pos)]) != NULL; (pos)++)
 
 #endif
