@@ -334,11 +334,11 @@ static inline const char *ben_str_val(const struct bencode *b)
  *
  * pos is a size_t.
  */
-#define ben_dict_for_each(key, value, pos, d) \
+#define ben_dict_for_each(bkey, bvalue, pos, d) \
 	for ((pos) = 0; \
 	     (pos) < ((const struct bencode_dict *) (d))->n && \
-	     ((key) = ((const struct bencode_dict *) (d))->nodes[(pos)].key) != NULL && \
-	     ((value) = ((const struct bencode_dict *) (d))->nodes[(pos)].value) != NULL; \
+	     ((bkey) = ((const struct bencode_dict *) (d))->nodes[(pos)].key) != NULL && \
+	     ((bvalue) = ((const struct bencode_dict *) (d))->nodes[(pos)].value) != NULL; \
 	     (pos)++)
 
 #endif
