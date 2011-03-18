@@ -8,6 +8,7 @@
 #include <ctype.h>
 
 #define MAX_ALLOC (((size_t) -1) / sizeof(struct bencode *) / 2)
+#define DICT_MAX_ALLOC (((size_t) -1) / sizeof(struct bencode_dict_node) / 2)
 
 struct decode {
 	const char *data;
@@ -120,30 +121,59 @@ static struct bencode *decode_bool(struct decode *ctx)
 	return (struct bencode *) b;
 }
 
+static size_t hash_bucket(long long hash, const struct bencode_dict *d)
+{
+	return hash & (d->alloc - 1);
+}
+
+static size_t hash_bucket_head(long long hash, const struct bencode_dict *d)
+{
+	if (d->buckets == NULL)
+		return -1;
+	return d->buckets[hash_bucket(hash, d)];
+}
+
 static int resize_dict(struct bencode_dict *d)
 {
-	struct bencode **newkeys;
-	struct bencode **newvalues;
-	size_t newsize;
+	size_t *newbuckets;
+	struct bencode_dict_node *newnodes;;
+	size_t newalloc;
+	size_t pos;
 
-	if (d->alloc >= MAX_ALLOC)
+	if (d->alloc >= DICT_MAX_ALLOC)
 		return -1;
 
 	if (d->alloc == 0)
-		d->alloc = 4;
+		newalloc = 4;
 	else
-		d->alloc *= 2;
-	newsize = sizeof(d->values[0]) * d->alloc;
+		newalloc = d->alloc * 2;
 
-	newkeys = realloc(d->keys, newsize);
-	newvalues = realloc(d->values, newsize);
-	if (newkeys == NULL || newvalues == NULL) {
-		free(newkeys);
-		free(newvalues);
+	/* size must be a power of two */
+	assert((newalloc & (newalloc - 1)) == 0);
+
+	newbuckets = realloc(d->buckets, sizeof(newbuckets[0]) * newalloc);
+	newnodes = realloc(d->nodes, sizeof(newnodes[0]) * newalloc);
+	if (newnodes == NULL || newbuckets == NULL) {
+		free(newnodes);
+		free(newbuckets);
 		return -1;
 	}
-	d->keys = newkeys;
-	d->values = newvalues;
+
+	d->alloc = newalloc;
+	d->buckets = newbuckets;
+	d->nodes = newnodes;
+
+	/* Clear all buckets */
+	memset(d->buckets, -1, d->alloc * sizeof(d->buckets[0]));
+
+	/* Reinsert nodes into buckets */
+	for (pos = 0; pos < d->n; pos++) {
+		struct bencode_dict_node *node = &d->nodes[pos];
+		size_t bucket = hash_bucket(node->hash, d);
+		node->next = d->buckets[bucket];
+		d->buckets[bucket] = pos;
+	}
+
 	return 0;
 }
 
@@ -185,9 +215,52 @@ int ben_cmp_qsort(const void *a, const void *b)
 	return ben_cmp(akey, bkey);
 }
 
+/* The string/binary object hash is copied from Python */
+static long long str_hash(const unsigned char *s, size_t len)
+{
+	long long hash;
+	size_t i;
+	if (len == 0)
+		return 0;
+	hash = s[0] << 7;
+	for (i = 0; i < len; i++)
+		hash = (1000003 * hash) ^ s[i];
+	hash ^= len;
+	if (hash == -1)
+		hash = -2;
+	return hash;
+}
+
+long long ben_str_hash(const struct bencode *b)
+{
+	const struct bencode_str *bstr = ben_str_const_cast(b);
+	const unsigned char *s = (unsigned char *) bstr->s;
+	return str_hash(s, bstr->len);
+}
+
+long long ben_int_hash(const struct bencode *b)
+{
+	long long x = ben_int_const_cast(b)->ll;
+	return (x == -1) ? -2 : x;
+}
+
+long long ben_hash(const struct bencode *b)
+{
+	switch (b->type) {
+	case BENCODE_INT:
+		return ben_int_hash(b);
+	case BENCODE_STR:
+		return ben_str_hash(b);
+	default:
+		fprintf(stderr, "bencode: hash: Invalid type: %d\n", b->type);
+		abort();
+	}		
+}
+
 static struct bencode *decode_dict(struct decode *ctx)
 {
 	struct bencode *key;
+	struct bencode *lastkey = NULL;
 	struct bencode *value;
 	struct bencode_dict *d;
 
@@ -215,7 +288,8 @@ static struct bencode *decode_dict(struct decode *ctx)
 			fprintf(stderr, "bencode: Invalid dict key type\n");
 			goto error;
 		}
-		if (d->n > 0 && ben_cmp(d->keys[d->n - 1], key) != -1) {
+
+		if (lastkey != NULL && ben_cmp(lastkey, key) != -1) {
 			ben_free(key);
 			key = NULL;
 			ctx->error = BEN_INVALID;
@@ -228,9 +302,9 @@ static struct bencode *decode_dict(struct decode *ctx)
 			key = NULL;
 			goto error;
 		}
-		d->keys[d->n] = key;
-		d->values[d->n] = value;
-		d->n++;
+
+		ben_dict_set((struct bencode *) d, key, value);
+		lastkey = key;
 	}
 	if (ctx->off >= ctx->len) {
 		ctx->error = BEN_INSUFFICIENT;
@@ -305,20 +379,21 @@ static struct bencode *decode_int(struct decode *ctx)
 static int resize_list(struct bencode_list *list)
 {
 	struct bencode **newvalues;
+	size_t newalloc;
 	size_t newsize;
 
 	if (list->alloc >= MAX_ALLOC)
 		return -1;
 
 	if (list->alloc == 0)
-		list->alloc = 4;
+		newalloc = 4;
 	else
-		list->alloc *= 2;
-	newsize = sizeof(list->values[0]) * list->alloc;
-
+		newalloc = list->alloc * 2;
+	newsize = sizeof(list->values[0]) * newalloc;
 	newvalues = realloc(list->values, newsize);
 	if (newvalues == NULL)
 		return -1;
+	list->alloc = newalloc;
 	list->values = newvalues;
 	return 0;
 }
@@ -451,10 +526,10 @@ static void free_dict(struct bencode_dict *d)
 {
 	size_t pos;
 	for (pos = 0; pos < d->n; pos++) {
-		ben_free(d->keys[pos]);
-		d->keys[pos] = NULL;
-		ben_free(d->values[pos]);
-		d->values[pos] = NULL;
+		ben_free(d->nodes[pos].key);
+		d->nodes[pos].key = NULL;
+		ben_free(d->nodes[pos].value);
+		d->nodes[pos].value = NULL;
 	}
 }
 
@@ -556,8 +631,8 @@ static int print(char *data, size_t size, size_t *pos, const struct bencode *b)
 			return -1;
 		}
 		for (i = 0; i < dict->n; i++) {
-			pairs[i].key = dict->keys[i];
-			pairs[i].value = dict->values[i];
+			pairs[i].key = dict->nodes[i].key;
+			pairs[i].value = dict->nodes[i].value;
 		}
 		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
@@ -649,9 +724,9 @@ static size_t get_printed_size(const struct bencode *b)
 		size += 1; /* "{" */
 		d = ben_dict_const_cast(b);
 		for (pos = 0; pos < d->n; pos++) {
-			size += get_printed_size(d->keys[pos]);
+			size += get_printed_size(d->nodes[pos].key);
 			size += 2; /* ": " */
-			size += get_printed_size(d->values[pos]);
+			size += get_printed_size(d->nodes[pos].value);
 			if (pos < (d->n - 1))
 				size += 2; /* ", " */
 		}
@@ -727,8 +802,8 @@ static int serialize(char *data, size_t size, size_t *pos,
 			return -1;
 		}
 		for (i = 0; i < dict->n; i++) {
-			pairs[i].key = dict->keys[i];
-			pairs[i].value = dict->values[i];
+			pairs[i].key = dict->nodes[i].key;
+			pairs[i].value = dict->nodes[i].value;
 		}
 		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
@@ -799,8 +874,8 @@ static size_t get_size(const struct bencode *b)
 	case BENCODE_DICT:
 		d = ben_dict_const_cast(b);
 		for (pos = 0; pos < d->n; pos++) {
-			size += get_size(d->keys[pos]);
-			size += get_size(d->values[pos]);
+			size += get_size(d->nodes[pos].key);
+			size += get_size(d->nodes[pos].value);
 		}
 		return size + 2;
 	case BENCODE_INT:
@@ -911,68 +986,167 @@ struct bencode *ben_dict(void)
 struct bencode *ben_dict_get(const struct bencode *dict, const struct bencode *key)
 {
 	const struct bencode_dict *d = ben_dict_const_cast(dict);
-	size_t pos;
-	for (pos = 0; pos < d->n; pos++) {
-		if (ben_cmp(d->keys[pos], key) == 0)
-			return d->values[pos];
+	long long hash = ben_hash(key);
+	size_t pos = hash_bucket_head(hash, d);
+	while (pos != -1) {
+		assert(pos < d->n);
+		if (d->nodes[pos].hash == hash &&
+		    ben_cmp(d->nodes[pos].key, key) == 0)
+			return d->nodes[pos].value;
+		pos = d->nodes[pos].next;
 	}
 	return NULL;
+}
+
+/*
+ * Note, we do not re-allocate memory, so one may not call ben_free for these
+ * instances. These are only used to optimize speed.
+ */
+static void inplace_ben_str(struct bencode_str *b, const char *s, size_t len)
+{
+	b->type = BENCODE_STR;
+	b->len = len;
+	b->s = (char *) s;
+}
+static void inplace_ben_int(struct bencode_int *i, long long ll)
+{
+	i->type = BENCODE_INT;
+	i->ll = ll;
 }
 
 struct bencode *ben_dict_get_by_str(const struct bencode *dict, const char *key)
 {
-	const struct bencode_dict *d = ben_dict_const_cast(dict);
-	size_t keylen = strlen(key);
-	struct bencode_str *dkey;
-	size_t pos;
-	for (pos = 0; pos < d->n; pos++) {
-		dkey = ben_str_cast(d->keys[pos]);
-		if (dkey == NULL)
-			continue;
-		if (dkey->len != keylen)
-			continue;
-		if (strcmp(dkey->s, key) == 0)
-			return d->values[pos];
-	}
-	return NULL;
+	struct bencode_str s;
+	inplace_ben_str(&s, key, strlen(key));
+	return ben_dict_get(dict, (struct bencode *) &s);
 }
 
-static void replacewithlast(struct bencode **arr, size_t i, size_t n)
+struct bencode *ben_dict_get_by_int(const struct bencode *dict, long long key)
 {
-	arr[i] = arr[n - 1];
-	arr[n - 1] = NULL;
+	struct bencode_int i;
+	inplace_ben_int(&i, key);
+	return ben_dict_get(dict, (struct bencode *) &i);
+}
+
+static size_t dict_find_pos(struct bencode_dict *d,
+			    const struct bencode *key, long long hash)
+{
+	size_t pos = hash_bucket_head(hash, d);
+	while (pos != -1) {
+		if (d->nodes[pos].hash == hash &&
+		    ben_cmp(d->nodes[pos].key, key) == 0)
+			break;
+		pos = d->nodes[pos].next;
+	}
+	return pos;
+}
+
+static void dict_unlink(struct bencode_dict *d, size_t bucket, size_t unlinkpos)
+{
+	size_t pos = d->buckets[bucket];
+	if (pos == unlinkpos) {
+		d->buckets[bucket] = d->nodes[unlinkpos].next;
+		return;
+	}
+	while (pos != -1) {
+		size_t next = d->nodes[pos].next;
+		if (next == unlinkpos) {
+			d->nodes[pos].next = d->nodes[next].next;
+			return;
+		}
+		pos = next;
+	}
+	fprintf(stderr, "Key should have been found. Can not unlink position %zu.\n", unlinkpos);
+	abort();
+}
+
+/* Remove node from the linked list, if found */
+static struct bencode *dict_pop(struct bencode_dict *d, 
+				const struct bencode *key, long long hash)
+{
+	struct bencode *value;
+	size_t removebucket = hash_bucket(hash, d);
+	size_t tailpos = d->n - 1;
+	size_t tailhash = d->nodes[tailpos].hash;
+	size_t tailbucket = hash_bucket(tailhash, d);
+	size_t removepos;
+
+	removepos = dict_find_pos(d, key, hash);
+	if (removepos == -1)
+		return NULL;
+
+	/*
+	 * WARNING: complicated code follows.
+	 *
+	 * First, unlink the node to be removed and the tail node.
+	 * We will actually later swap the positions of removed node and
+	 * tail node inside the d->nodes array. We want to preserve
+	 * d->nodes array in a state where positions from 0 to (d->n - 1)
+	 * are always occupied with a valid node. This is done to make
+	 * dictionary walk fast by simply walking positions 0 to (d->n - 1)
+	 * in a for loop.
+	 */
+	dict_unlink(d, removebucket, removepos);
+	if (removepos != tailpos)
+		dict_unlink(d, tailbucket, tailpos);
+
+	/* Then read the removed node and free its key */
+	value = d->nodes[removepos].value;
+	ben_free(d->nodes[removepos].key);
+
+	/* Then re-insert the unliked tail node in the place of removed node */
+	d->nodes[removepos] = d->nodes[tailpos];
+	memset(&d->nodes[tailpos], 0, sizeof d->nodes[tailpos]); /* poison */
+	tailpos = removepos;
+
+	/* Then re-link the tail node to its bucket */
+	d->nodes[tailpos].next = d->buckets[tailbucket];
+	d->buckets[tailbucket] = tailpos;
+
+	d->n -= 1;
+	return value;
 }
 
 struct bencode *ben_dict_pop(struct bencode *dict, const struct bencode *key)
 {
 	struct bencode_dict *d = ben_dict_cast(dict);
-	size_t pos;
-	for (pos = 0; pos < d->n; pos++) {
-		if (ben_cmp(d->keys[pos], key) == 0) {
-			struct bencode *value = d->values[pos];
-			ben_free(d->keys[pos]);
-			replacewithlast(d->keys, pos, d->n);
-			replacewithlast(d->values, pos, d->n);
-			d->n -= 1;
-			return value;
-		}
-	}
-	return NULL;
+	return dict_pop(d, key, ben_hash(key));
 }
 
 int ben_dict_set(struct bencode *dict, struct bencode *key, struct bencode *value)
 {
 	struct bencode_dict *d = ben_dict_cast(dict);
+	long long hash = ben_hash(key);
+	size_t bucket;
+	size_t pos;
+
+	assert(value != NULL);
+
+	pos = hash_bucket_head(hash, d);
+	for (; pos != -1; pos = d->nodes[pos].next) {
+		assert(pos < d->n);
+		if (d->nodes[pos].hash != hash || ben_cmp(d->nodes[pos].key, key) != 0)
+			continue;
+		ben_free(d->nodes[pos].key);
+		ben_free(d->nodes[pos].value);
+		d->nodes[pos].key = key;
+		d->nodes[pos].value = value;
+		/* 'hash' and 'next' members stay the same */
+		return 0;
+	}
 
 	assert(d->n <= d->alloc);
 	if (d->n == d->alloc && resize_dict(d))
 		return -1;
 
-	ben_free(ben_dict_pop(dict, key));
-
-	d->keys[d->n] = key;
-	d->values[d->n] = value;
+	bucket = hash_bucket(hash, d);
+	pos = d->n;
+	d->nodes[pos] = (struct bencode_dict_node) {.hash = hash,
+						    .key = key,
+						    .value = value,
+						    .next = d->buckets[bucket]};
 	d->n++;
+	d->buckets[bucket] = pos;
 	return 0;
 }
 
@@ -1026,6 +1200,7 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	assert(l->n <= l->alloc);
 	if (l->n == l->alloc && resize_list(l))
 		return -1;
+	assert(b != NULL);
 	l->values[l->n] = b;
 	l->n += 1;
 	return 0;
@@ -1039,6 +1214,7 @@ void ben_list_set(struct bencode *list, size_t i, struct bencode *b)
 		abort();
 	}
 	ben_free(l->values[i]);
+	assert(b != NULL);
 	l->values[i] = b;
 }
 

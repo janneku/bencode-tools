@@ -345,6 +345,55 @@ static void dict_tests(void)
 	assert(ben_dict_get(d, key2) != NULL);
 }
 
+static void dict_tests_2(void)
+{
+	struct bencode *d;
+	int i;
+	long long llkey;
+	const int n = 50;
+	size_t nkeys;
+	size_t pos;
+	struct bencode *key;
+	struct bencode *value;
+
+	srandom(666);
+	d = ben_dict();
+	assert(d != NULL);
+	for (i = 0; i < n; i++) {
+		llkey = random();
+		assert(ben_dict_set(d, ben_int(llkey), ben_str("foo")) == 0);
+	}
+	nkeys = 0;
+	ben_dict_for_each(key, value, pos, d) {
+		nkeys++;
+	}
+	assert(nkeys > 0 && nkeys <= n);
+	ben_free(d);
+
+	d = ben_dict();
+	assert(d != NULL);
+	for (i = 0; i < n; i++) {
+		llkey = i;
+		assert(ben_dict_set(d, ben_int(llkey), ben_str("foo")) == 0);
+	}
+
+	nkeys = 0;
+	ben_dict_for_each(key, value, pos, d) {
+		nkeys++;
+	}
+	assert(nkeys == n);
+	for (i = 0; i < n; i++) {
+		struct bencode *value = ben_dict_get_by_int(d, i);
+		assert(value != NULL);
+	}
+	for (i = 0; i < n; i++) {
+		struct bencode *value = ben_dict_pop(d, ben_int(i));
+		assert(value != NULL);
+		ben_free(value);
+	}
+	ben_free(d);
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -405,6 +454,8 @@ int main(void)
 	print_tests();
 
 	dict_tests();
+
+	dict_tests_2();
 
 	return 0;
 }

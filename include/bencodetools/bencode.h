@@ -27,13 +27,19 @@ struct bencode_bool {
 	char b;
 };
 
+struct bencode_dict_node {
+	long long hash;
+	struct bencode *key;
+	struct bencode *value;
+	size_t next;
+};
+
 struct bencode_dict {
 	char type;
 	size_t n;
 	size_t alloc;
-	/* keys and values can be put into a same array, later */
-	struct bencode **keys;
-	struct bencode **values;
+	size_t *buckets;
+	struct bencode_dict_node *nodes;
 };
 
 struct bencode_int {
@@ -106,6 +112,10 @@ size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b);
 /* You must use ben_free() for all allocated bencode structures after use */
 void ben_free(struct bencode *b);
 
+long long ben_str_hash(const struct bencode *b);
+long long ben_int_hash(const struct bencode *b);
+long long ben_hash(const struct bencode *b);
+
 /* Create a string from binary data with len bytes */
 struct bencode *ben_blob(const void *data, size_t len);
 
@@ -122,6 +132,7 @@ struct bencode *ben_dict(void);
 struct bencode *ben_dict_get(const struct bencode *d, const struct bencode *key);
 
 struct bencode *ben_dict_get_by_str(const struct bencode *d, const char *key);
+struct bencode *ben_dict_get_by_int(const struct bencode *d, long long key);
 
 /*
  * Try to locate 'key' in dictionary. Returns the associated value, if found.
@@ -321,6 +332,10 @@ static inline const char *ben_str_val(const struct bencode *b)
  * pos is a size_t.
  */
 #define ben_dict_for_each(key, value, pos, d) \
-	for ((pos) = 0; (pos) < ((const struct bencode_dict *) (d))->n && ((key) = ((const struct bencode_dict *) (d))->keys[(pos)]) != NULL && ((value) = ((const struct bencode_dict *) (d))->values[(pos)]) != NULL; (pos)++)
+	for ((pos) = 0; \
+	     (pos) < ((const struct bencode_dict *) (d))->n && \
+	     ((key) = ((const struct bencode_dict *) (d))->nodes[(pos)].key) != NULL && \
+	     ((value) = ((const struct bencode_dict *) (d))->nodes[(pos)].value) != NULL; \
+	     (pos)++)
 
 #endif
