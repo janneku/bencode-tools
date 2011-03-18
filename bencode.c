@@ -531,6 +531,12 @@ static void free_dict(struct bencode_dict *d)
 		ben_free(d->nodes[pos].value);
 		d->nodes[pos].value = NULL;
 	}
+	d->n = -1;
+	d->alloc = -1;
+	free(d->buckets);
+	d->buckets = NULL;
+	free(d->nodes);
+	d->nodes = NULL;
 }
 
 static void free_list(struct bencode_list *list)
@@ -1033,6 +1039,7 @@ static size_t dict_find_pos(struct bencode_dict *d,
 {
 	size_t pos = hash_bucket_head(hash, d);
 	while (pos != -1) {
+		assert(pos < d->n);
 		if (d->nodes[pos].hash == hash &&
 		    ben_cmp(d->nodes[pos].key, key) == 0)
 			break;
@@ -1044,14 +1051,24 @@ static size_t dict_find_pos(struct bencode_dict *d,
 static void dict_unlink(struct bencode_dict *d, size_t bucket, size_t unlinkpos)
 {
 	size_t pos = d->buckets[bucket];
+	size_t next;
+	size_t nextnext;
+
+	assert(unlinkpos < d->n);
+
 	if (pos == unlinkpos) {
-		d->buckets[bucket] = d->nodes[unlinkpos].next;
+		next = d->nodes[unlinkpos].next;
+		assert(next < d->n || next == -1);
+		d->buckets[bucket] = next;
 		return;
 	}
 	while (pos != -1) {
-		size_t next = d->nodes[pos].next;
+		assert(pos < d->n);
+		next = d->nodes[pos].next;
 		if (next == unlinkpos) {
-			d->nodes[pos].next = d->nodes[next].next;
+			nextnext = d->nodes[next].next;
+			assert(nextnext < d->n || nextnext == -1);
+			d->nodes[pos].next = nextnext;
 			return;
 		}
 		pos = next;
@@ -1097,11 +1114,16 @@ static struct bencode *dict_pop(struct bencode_dict *d,
 	/* Then re-insert the unliked tail node in the place of removed node */
 	d->nodes[removepos] = d->nodes[tailpos];
 	memset(&d->nodes[tailpos], 0, sizeof d->nodes[tailpos]); /* poison */
-	tailpos = removepos;
+	d->nodes[tailpos].next = ((size_t) -1) / 2;
 
-	/* Then re-link the tail node to its bucket */
-	d->nodes[tailpos].next = d->buckets[tailbucket];
-	d->buckets[tailbucket] = tailpos;
+	/*
+	 * Then re-link the tail node to its bucket, unless the tail node
+	 * was the one to be removed.
+	 */
+	if (removepos != tailpos) {
+		d->nodes[removepos].next = d->buckets[tailbucket];
+		d->buckets[tailbucket] = removepos;
+	}
 
 	d->n -= 1;
 	return value;
