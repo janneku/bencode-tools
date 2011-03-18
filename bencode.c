@@ -1113,6 +1113,20 @@ struct bencode *ben_dict_pop(struct bencode *dict, const struct bencode *key)
 	return dict_pop(d, key, ben_hash(key));
 }
 
+struct bencode *ben_dict_pop_by_str(struct bencode *dict, const char *key)
+{
+	struct bencode_str s;
+	inplace_ben_str(&s, key, strlen(key));
+	return ben_dict_pop(dict, (struct bencode *) &s);
+}
+
+struct bencode *ben_dict_pop_by_int(struct bencode *dict, long long key)
+{
+	struct bencode_int i;
+	inplace_ben_int(&i, key);
+	return ben_dict_pop(dict, (struct bencode *) &i);
+}
+
 int ben_dict_set(struct bencode *dict, struct bencode *key, struct bencode *value)
 {
 	struct bencode_dict *d = ben_dict_cast(dict);

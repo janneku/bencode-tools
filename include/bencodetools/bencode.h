@@ -141,6 +141,9 @@ struct bencode *ben_dict_get_by_int(const struct bencode *d, long long key);
  */
 struct bencode *ben_dict_pop(struct bencode *d, const struct bencode *key);
 
+struct bencode *ben_dict_pop_by_str(struct bencode *d, const char *key);
+struct bencode *ben_dict_pop_by_int(struct bencode *d, long long key);
+
 /*
  * Set 'key' in dictionary to be 'value'. An old value exists for the key
  * is freed if it exists. 'key' and 'value' are owned by the dictionary

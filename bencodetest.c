@@ -376,18 +376,44 @@ static void dict_tests_2(void)
 		llkey = i;
 		assert(ben_dict_set(d, ben_int(llkey), ben_str("foo")) == 0);
 	}
-
 	nkeys = 0;
 	ben_dict_for_each(key, value, pos, d) {
 		nkeys++;
 	}
 	assert(nkeys == n);
 	for (i = 0; i < n; i++) {
-		struct bencode *value = ben_dict_get_by_int(d, i);
+		value = ben_dict_get_by_int(d, i);
 		assert(value != NULL);
 	}
 	for (i = 0; i < n; i++) {
-		struct bencode *value = ben_dict_pop(d, ben_int(i));
+		value = ben_dict_pop(d, ben_int(i));
+		assert(value != NULL);
+		ben_free(value);
+	}
+	ben_free(d);
+
+	d = ben_dict();
+	assert(d != NULL);
+	for (i = 0; i < n; i++) {
+		char skey[32];
+		snprintf(skey, sizeof skey, "%d", i);
+		assert(ben_dict_set_by_str(d, skey, ben_str("foo")) == 0);
+	}
+	nkeys = 0;
+	ben_dict_for_each(key, value, pos, d) {
+		nkeys++;
+	}
+	assert(nkeys == n);
+	for (i = 0; i < n; i++) {
+		char skey[32];
+		snprintf(skey, sizeof skey, "%d", i);
+		value = ben_dict_get_by_str(d, skey);
+		assert(value != NULL);
+	}
+	for (i = 0; i < n; i++) {
+		char skey[32];
+		snprintf(skey, sizeof skey, "%d", i);
+		value = ben_dict_pop_by_str(d, skey);
 		assert(value != NULL);
 		ben_free(value);
 	}
