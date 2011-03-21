@@ -1091,6 +1091,7 @@ static struct bencode *dict_pop(struct bencode_dict *d,
 	removepos = dict_find_pos(d, key, hash);
 	if (removepos == -1)
 		return NULL;
+	key = NULL; /* avoid using the pointer again, it may not be valid */
 
 	/*
 	 * WARNING: complicated code follows.
@@ -1147,6 +1148,15 @@ struct bencode *ben_dict_pop_by_int(struct bencode *dict, long long key)
 	struct bencode_int i;
 	inplace_ben_int(&i, key);
 	return ben_dict_pop(dict, (struct bencode *) &i);
+}
+
+/* This can be used from the ben_dict_for_each() iterator */
+struct bencode *ben_dict_pop_current(struct bencode *dict, size_t *pos)
+{
+	struct bencode_dict *d = ben_dict_cast(dict);
+	struct bencode *value = ben_dict_pop(dict, d->nodes[*pos].key);
+	(*pos)--;
+	return value;
 }
 
 int ben_dict_set(struct bencode *dict, struct bencode *key, struct bencode *value)
@@ -1240,6 +1250,39 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	l->values[l->n] = b;
 	l->n += 1;
 	return 0;
+}
+
+int ben_list_append_str(struct bencode *list, const char *s)
+{
+	struct bencode *bs = ben_str(s);
+	if (bs == NULL)
+		return -1;
+	return ben_list_append(list, bs);
+}
+
+int ben_list_append_int(struct bencode *list, long long ll)
+{
+	struct bencode *bll = ben_int(ll);
+	if (bll == NULL)
+		return -1;
+	return ben_list_append(list, bll);
+}
+
+struct bencode *ben_list_pop(struct bencode *list, size_t pos)
+{
+	struct bencode_list *l = ben_list_cast(list);
+	struct bencode *value;
+
+	assert(pos < l->n);
+
+	value = ben_list_get(list, pos);
+
+	for (; (pos + 1) < l->n; pos++)
+		l->values[pos] = l->values[pos + 1];
+
+	l->values[l->n - 1] = NULL;
+	l->n--;
+	return value;
 }
 
 void ben_list_set(struct bencode *list, size_t i, struct bencode *b)

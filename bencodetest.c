@@ -337,12 +337,26 @@ static void dict_tests(void)
 	struct bencode *i = ben_int(0);
 	struct bencode *key2 = ben_str("key2");
 	struct bencode *i2 = ben_int(0);
+	struct bencode *key;
+	struct bencode *value;
+	size_t pos;
 
 	assert(d != NULL && i != NULL && key2 != NULL && i2 != NULL);
 	assert(ben_dict_set_by_str(d, "key", i) == 0);
 	assert(ben_dict_get_by_str(d, "key") != NULL);
 	assert(ben_dict_set(d, key2, i2) == 0);
 	assert(ben_dict_get(d, key2) != NULL);
+	ben_free(d);
+
+	d = ben_dict();
+	assert(!ben_dict_set_str_by_str(d, "foo0", "a"));
+	assert(!ben_dict_set_str_by_str(d, "bar0", "b"));
+	assert(!ben_dict_set_str_by_str(d, "foo1", "c"));
+	ben_dict_for_each(key, value, pos, d) {
+		if (strncmp(ben_str_val(key), "foo", 3) != 0)
+			ben_free(ben_dict_pop_current(d, &pos));
+	}
+	assert(ben_dict_len(d) == 2);
 }
 
 static void dict_tests_2(void)
@@ -420,6 +434,25 @@ static void dict_tests_2(void)
 	ben_free(d);
 }
 
+static void list_tests(void)
+{
+	struct bencode *l = ben_list();
+	struct bencode *value;
+	size_t pos;
+
+	assert(!ben_list_append_str(l, "foo0"));
+	assert(!ben_list_append_str(l, "bar0"));
+	assert(!ben_list_append_str(l, "foo1"));
+	assert(!ben_list_append_str(l, "foo2"));
+	assert(ben_list_pop(l, 3) != NULL);
+	assert(ben_list_len(l) == 3);
+	ben_list_for_each(value, pos, l) {
+		if (strncmp(ben_str_val(value), "foo", 3) != 0)
+			ben_free(ben_list_pop_current(l, &pos));
+	}
+	assert(ben_list_len(l) == 2);
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -482,6 +515,8 @@ int main(void)
 	dict_tests();
 
 	dict_tests_2();
+
+	list_tests();
 
 	return 0;
 }

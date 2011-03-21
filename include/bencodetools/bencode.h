@@ -1,6 +1,7 @@
 #ifndef TYPEVALIDATOR_BENCODE_H
 #define TYPEVALIDATOR_BENCODE_H
 
+#include <stdlib.h>
 #include <stdio.h>
 
 enum {
@@ -172,6 +173,12 @@ struct bencode *ben_list(void);
  */
 int ben_list_append(struct bencode *list, struct bencode *b);
 
+int ben_list_append_str(struct bencode *list, const char *s);
+int ben_list_append_int(struct bencode *list, long long ll);
+
+/* Remove and return value at position 'pos' in list */
+struct bencode *ben_list_pop(struct bencode *list, size_t pos);
+
 /*
  * Returns a Python formatted C string representation of 'b' on success,
  * NULL on failure. The returned string should be freed with free().
@@ -276,14 +283,15 @@ static inline size_t ben_list_len(const struct bencode *b)
 	return ben_list_const_cast(b)->n;
 }
 
-/*
- * ben_list_get(list, i) returns object at position i in list,
- * or NULL if position i is out of bounds.
- */
+/* ben_list_get(list, i) returns object at position i in list */
 static inline struct bencode *ben_list_get(const struct bencode *list, size_t i)
 {
 	const struct bencode_list *l = ben_list_const_cast(list);
-	return i < l->n ? l->values[i] : NULL;
+	if (i >= l->n) {
+		fprintf(stderr, "bencodetools: List index out of bounds\n");
+		abort();
+	}
+	return l->values[i];
 }
 
 /*
@@ -324,13 +332,52 @@ static inline const char *ben_str_val(const struct bencode *b)
 /*
  * ben_list_for_each() is an iterator macro for bencoded lists.
  *
+ * Note, it is not allowed to change the list while iterating except by
+ * using ben_list_pop_current().
+ *
  * pos is a size_t.
  */
-#define ben_list_for_each(b, pos, l) \
-	for ((pos) = 0; (pos) < ((const struct bencode_list *) (l))->n && ((b) = ((const struct bencode_list *) (l))->values[(pos)]) != NULL ; (pos)++)
+#define ben_list_for_each(value, pos, l) \
+	for ((pos) = 0; \
+	     (pos) < ((const struct bencode_list *) (l))->n && \
+	     ((value) = ((const struct bencode_list *) (l))->values[(pos)]) != NULL ; \
+	     (pos)++)
+
+/*
+ * ben_list_pop_current() returns and removes the current item at 'pos'
+ * while iterating the list with ben_list_for_each().
+ * It can be used more than once per walk, but only once per item.
+ * Example below:
+ *
+ * Filter out all items from list whose string value does not begin with "foo".
+ *
+ * ben_list_for_each(value, pos, list) {
+ *     if (strncmp(ben_str_val(value), "foo", 3) != 0)
+ *         ben_free(ben_list_pop_current(&pos, list));
+ * }
+ */
+static inline struct bencode *ben_list_pop_current(struct bencode *list, size_t *pos)
+{
+	struct bencode *value = ben_list_pop(list, *pos);
+	(*pos)--;
+	return value;
+}
 
 /*
  * ben_dict_for_each() is an iterator macro for bencoded dictionaries.
+ *
+ * Note, it is not allowed to change the dictionary while iterating except
+ * by using ben_dict_pop_current().
+ *
+ * struct bencode *dict = ben_dict();
+ * size_t pos;
+ * struct bencode *key;
+ * struct bencode *value;
+ * ben_dict_set_str_by_str(dict, "foo", "bar");
+ *
+ * ben_dict_for_each(key, value, pos, dict) {
+ *     use(key, value);
+ * }
  *
  * pos is a size_t.
  */
@@ -340,5 +387,19 @@ static inline const char *ben_str_val(const struct bencode *b)
 	     ((bkey) = ((const struct bencode_dict *) (d))->nodes[(pos)].key) != NULL && \
 	     ((bvalue) = ((const struct bencode_dict *) (d))->nodes[(pos)].value) != NULL; \
 	     (pos)++)
+
+/*
+ * ben_dict_pop_current() deletes the current item at 'pos' while iterating
+ * the dictionary with ben_dict_for_each(). It can be used more than once
+ * per walk, but only once per item. Example below:
+ *
+ * Filter out all items from dictionary whose key does not begin with "foo".
+ *
+ * ben_dict_for_each(key, value, pos, dict) {
+ *     if (strncmp(ben_str_val(key), "foo", 3) != 0)
+ *         ben_free(ben_dict_pop_current(dict, &pos));
+ * }
+ */
+struct bencode *ben_dict_pop_current(struct bencode *dict, size_t *pos);
 
 #endif
