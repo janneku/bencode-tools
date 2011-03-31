@@ -138,7 +138,7 @@ static int process(int fd)
 				needmore = 1;
 				continue;
 			}
-			fprintf(stderr, "bencat: Invalid data stream\n");
+			fprintf(stderr, "bencat: Invalid data stream at offset %zu\n", off);
 			goto error;
 		}
 
