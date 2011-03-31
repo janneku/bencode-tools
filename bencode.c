@@ -466,6 +466,7 @@ static struct bencode *decode_str(struct decode *ctx)
 
 static struct bencode *decode(struct decode *ctx)
 {
+	struct bencode *b;
 	ctx->level++;
 	if (ctx->level > 256)
 		return invalid_ptr(ctx);
@@ -485,18 +486,25 @@ static struct bencode *decode(struct decode *ctx)
 	case '7':
 	case '8':
 	case '9':
-		return decode_str(ctx);
+		b = decode_str(ctx);
+		break;
 	case 'b':
-		return decode_bool(ctx);
+		b = decode_bool(ctx);
+		break;
 	case 'd':
-		return decode_dict(ctx);
+		b = decode_dict(ctx);
+		break;
 	case 'i':
-		return decode_int(ctx);
+		b = decode_int(ctx);
+		break;
 	case 'l':
-		return decode_list(ctx);
+		b = decode_list(ctx);
+		break;
 	default:
 		return invalid_ptr(ctx);
 	}
+	ctx->level--;
+	return b;
 }
 
 struct bencode *ben_decode(const void *data, size_t len)
