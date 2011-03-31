@@ -453,6 +453,127 @@ static void list_tests(void)
 	assert(ben_list_len(l) == 2);
 }
 
+static void decode_printed_tests(void)
+{
+	struct {
+		char *s;
+		size_t l;
+		int e;
+		int line;
+		long long ival;
+	} testcases[] = {
+		/* string tests */
+		{.s = "''", .l = 2},
+		{.s = "''", .l = 2},
+		{.s = "'a'", .l = 3},
+		{.s = "'ab'", .l = 4},
+		{.s = "'\0'", .l = 3, .e = BEN_INVALID},
+		{.s = "'\\x00'", .l = 6},
+		{.s = "'\\\\'", .l = 4},
+		{.s = "'\\''", .l = 4},
+		{.s = "'\"'", .l = 3},
+		{.s = "\"'\"", .l = 3},
+		{.s = "'", .l = 1, .e = BEN_INSUFFICIENT},
+		{.s = "\"", .l = 1, .e = BEN_INSUFFICIENT},
+		{.s = "'a\"", .l = 3, .e = BEN_INSUFFICIENT},
+
+		/* list tests */
+		{.s = "[]", .l = 2},
+		{.s = "[,]", .l = 3, .e = BEN_INVALID},
+		{.s = "[1]", .l = 3},
+		{.s = "[1,]", .l = 4},
+		{.s = "[1,2]", .l = 5},
+		{.s = "[1,2,]", .l = 6},
+		{.s = "['']", .l = 4},
+		{.s = "[''] ", .l = 5},
+		{.s = " ['']", .l = 5},
+
+		/* int tests */
+		{.s = "0", .l = 1, .ival = 0},
+		{.s = " 0", .l = 2, .ival = 0},
+		{.s = "0 ", .l = 2, .ival = 0},
+		{.s = "-0", .l = 1, .e = BEN_INSUFFICIENT},
+		{.s = "-0", .l = 2, .ival = 0},
+		{.s = "-1", .l = 2, .ival = -1},
+		{.s = "1", .l = 1, .ival = 1},
+		{.s = "10", .l = 2, .ival = 10},
+		{.s = "0x0", .l = 3, .ival = 0},
+		{.s = "0x", .l = 2, .e = BEN_INSUFFICIENT},
+		{.s = "-0x1", .l = 4, .ival = -1},
+		{.s = "0xa", .l = 3, .ival = 10},
+		{.s = "0x10", .l = 4, .ival = 16},
+		{.s = "010", .l = 3, .ival = 8},
+		{.s = "001", .l = 3, .ival = 1},
+		{.s = "-010", .l = 4, .ival = -8},
+		{.s = "0xk", .l = 3, .e = BEN_INVALID},
+		{.s = "0x1000", .l = 6, .ival = 4096},
+
+		/* bool tests */
+		{.s = "T", .l = 1, .e = BEN_INSUFFICIENT},
+		{.s = "Tr", .l = 2, .e = BEN_INSUFFICIENT},
+		{.s = "Tru", .l = 3, .e = BEN_INSUFFICIENT},
+		{.s = "True", .l = 4},
+		{.s = "True ", .l = 4},
+		{.s = "Truf", .l = 4, .e = BEN_INVALID},
+		{.s = "F", .l = 1, .e = BEN_INSUFFICIENT},
+		{.s = "Fa", .l = 2, .e = BEN_INSUFFICIENT},
+		{.s = "Fal", .l = 3, .e = BEN_INSUFFICIENT},
+		{.s = "Fals", .l = 4, .e = BEN_INSUFFICIENT},
+		{.s = "False", .l = 5},
+		{.s = "False ", .l = 6},
+		{.s = "Falsf", .l = 5, .e = BEN_INVALID},
+
+		/* dict tests */
+		{.s = "{}", .l = 2},
+		{.s = "{1: 2}", .l = 6},
+		{.s = "{", .l = 1, .e = BEN_INSUFFICIENT},
+		{.s = "{'", .l = 2, .e = BEN_INSUFFICIENT},
+		{.s = "{'a", .l = 3, .e = BEN_INSUFFICIENT},
+		{.s = "{'a'", .l = 4, .e = BEN_INSUFFICIENT},
+		{.s = "{'a':", .l = 5, .e = BEN_INSUFFICIENT},
+		{.s = "{'a': ", .l = 6, .e = BEN_INSUFFICIENT},
+		{.s = "{'a': '", .l = 7, .e = BEN_INSUFFICIENT},
+		{.s = "{'a': 'b", .l = 8, .e = BEN_INSUFFICIENT},
+		{.s = "{'a': 'b'", .l = 9, .e = BEN_INSUFFICIENT},
+		{.s = "{'a': 'b'}", .l = 10},
+		{.s = "{'a': []}", .l = 9},
+		{.s = "{'a': [1]}", .l = 10},
+
+		{.s = "{'a': 'b'\n}", .l = 11},
+		{.s = "{'a': 'b',\n}", .l = 12},
+		{.s = "{'a': 'b'\n'c'}", .l = 14, .e = BEN_INVALID, .line = 1},
+		{.s = "{'a': 'b'\n\n'c'}", .l = 15, .e = BEN_INVALID, .line = 2},
+		{.s = NULL}};
+	int i;
+	struct bencode_error err;
+	size_t off;
+	struct bencode *b;
+
+	for (i = 0; testcases[i].s != NULL; i++) {
+		off = 0;
+		b = ben_decode_printed2(testcases[i].s, testcases[i].l, &off, &err);
+		if (testcases[i].e != err.error) {
+			fprintf(stderr, "Error in test case %s\n", testcases[i].s);
+			exit(1);
+		}
+
+		if (testcases[i].line > 0 &&
+		    (err.error == BEN_OK || err.line != testcases[i].line)) {
+			fprintf(stderr, "Unexpected error line in test case %s. Expected line %d but got %d\n", testcases[i].s, testcases[i].line, err.line);
+
+		}
+
+		if (err.error == 0 && ben_is_int(b) &&
+		    ben_int_val(b) != testcases[i].ival) {
+			fprintf(stderr, "Invalid result value in test case %s. Got %lld, but expected %lld\n", testcases[i].s, ben_int_val(b), testcases[i].ival);
+			exit(1);
+		}
+
+		ben_free(b);
+		b = NULL;
+	}
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -517,6 +638,8 @@ int main(void)
 	dict_tests_2();
 
 	list_tests();
+
+	decode_printed_tests();
 
 	return 0;
 }

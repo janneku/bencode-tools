@@ -61,6 +61,12 @@ struct bencode_str {
 	char *s;
 };
 
+struct bencode_error {
+	int error;  /* 0 if no errors */
+	int line;   /* Error line: 0 is the first line */
+	size_t off; /* Error offset in bytes from the start */
+};
+
 /*
  * Decode 'data' with 'len' bytes of data. Returns NULL on error.
  * The encoded data must be exactly 'len' bytes (not less), otherwise NULL
@@ -83,6 +89,23 @@ struct bencode *ben_decode(const void *data, size_t len);
  * was given for decoding. BEN_NO_MEMORY means decoding ran out of memory.
  */
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *error);
+
+/*
+ * Same as ben_decode(), but decodes data encoded with ben_print(). This is
+ * whitespace tolerant, so intended Python syntax can also be read.
+ *
+ * For example, this can be used to read in config files written as a Python
+ * dictionary.
+ *
+ * ben_decode_printed2() fills information about the error in
+ * struct bencode_error.
+ * error->error is 0 on success, otherwise it is an error code
+ * (see ben_decode2()).
+ * error->line is the line number where error occured.
+ * error->off is the byte offset of error (approximation).
+ */
+struct bencode *ben_decode_printed(const void *data, size_t len);
+struct bencode *ben_decode_printed2(const void *data, size_t len, size_t *off, struct bencode_error *error);
 
 /*
  * ben_cmp() is similar to strcmp(), but compares both integers and strings.

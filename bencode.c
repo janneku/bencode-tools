@@ -16,6 +16,8 @@ struct decode {
 	size_t off;
 	int error;
 	int level;
+	char c;
+	int line;
 };
 
 /*
@@ -31,6 +33,7 @@ struct bencode_keyvalue {
 };
 
 static struct bencode *decode(struct decode *ctx);
+static struct bencode *decode_printed(struct decode *ctx);
 
 static size_t find(const char *data, size_t len, size_t off, char c)
 {
@@ -97,6 +100,29 @@ static void *oom_ptr(struct decode *ctx)
 {
 	ctx->error = BEN_NO_MEMORY;
 	return NULL;
+}
+
+static struct bencode *internal_blob(void *data, size_t len)
+{
+	struct bencode_str *b = alloc(BENCODE_STR);
+	if (b == NULL)
+		return NULL;
+	b->s = data;
+	b->len = len;
+	assert(b->s[len] == 0);
+	return (struct bencode *) b;
+}
+
+static int seek_char(struct decode *ctx)
+{
+	while (ctx->off < ctx->len) {
+		if (!isspace(ctx->data[ctx->off]))
+			return 0;
+		if (ctx->data[ctx->off] == '\n')
+			ctx->line++;
+		ctx->off++;
+	}
+	return insufficient(ctx);
 }
 
 static struct bencode *decode_bool(struct decode *ctx)
@@ -526,6 +552,394 @@ struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *erro
 	if (error != NULL) {
 		assert((b != NULL) ^ (ctx.error != 0));
 		*error = ctx.error;
+	}
+	return b;
+}
+
+static struct bencode *decode_printed_bool(struct decode *ctx)
+{
+	struct bencode *b;
+	int bval = -1;
+	if ((ctx->off + 3) >= ctx->len)
+		return insufficient_ptr(ctx);
+	if (memcmp(ctx->data + ctx->off, "True", 4) == 0) {
+		bval = 1;
+		ctx->off += 4;
+	}
+	if (bval < 0) {
+		/* It's not 'True', so it can only be 'False'. Verify it. */
+		if (memcmp(ctx->data + ctx->off, "Fals", 4) != 0)
+			return invalid_ptr(ctx);
+		if ((ctx->off + 4) >= ctx->len)
+			return insufficient_ptr(ctx);
+		if (ctx->data[ctx->off + 4] != 'e')
+			return invalid_ptr(ctx);
+		bval = 0;
+		ctx->off += 5;
+	}
+	assert(bval == 0 || bval == 1);
+	b = ben_bool(bval);
+	if (b == NULL)
+		return oom_ptr(ctx);
+	return b;
+}
+
+static struct bencode *decode_printed_dict(struct decode *ctx)
+{
+	struct bencode *d = ben_dict();
+	int dictstate = 0; /* 0 == key, 1 == colon, 2 == value, 3 == comma */
+	struct bencode *key = NULL;
+	struct bencode *value = NULL;
+
+	if (d == NULL)
+		return oom_ptr(ctx);
+
+	ctx->off++;
+
+	while (1) {
+		if (seek_char(ctx))
+			goto nullpath;
+
+		switch (dictstate) {
+		case 0:
+			if (ctx->data[ctx->off] == '}') {
+				ctx->off++;
+				goto exit;
+			}
+			key = decode_printed(ctx);
+			if (key == NULL)
+				goto nullpath;
+			dictstate = 1;
+			break;
+		case 1:
+			if (ctx->data[ctx->off] != ':')
+				goto invalidpath;
+			ctx->off++;
+			dictstate = 2;
+			break;
+		case 2:
+			value = decode_printed(ctx);
+			if (value == NULL)
+				goto nullpath;
+			assert(key != NULL);
+			if (ben_dict_set(d, key, value)) {
+				ben_free(key);
+				ben_free(value);
+				ben_free(d);
+				return oom_ptr(ctx);
+			}
+			key = NULL;
+			value = NULL;
+			dictstate = 3;
+			break;
+		case 3:
+			if (ctx->data[ctx->off] == '}') {
+				ctx->off++;
+				goto exit;
+			}
+			if (ctx->data[ctx->off] != ',')
+				goto invalidpath;
+			ctx->off++;
+			dictstate = 0;
+			break;
+		default:
+			fprintf(stderr, "bencode: Invalid dictstate: %d\n", dictstate);
+			abort();
+		}
+	}
+
+exit:
+	return d;
+
+invalidpath:
+	ben_free(key);
+	ben_free(value);
+	ben_free(d);
+	return invalid_ptr(ctx);
+
+nullpath:
+	ben_free(key);
+	ben_free(value);
+	ben_free(d);
+	return NULL;
+}
+
+static struct bencode *decode_printed_int(struct decode *ctx)
+{
+	long long ll;
+	char buf[LONGLONGSIZE];
+	char *end;
+	size_t pos = 0;
+	struct bencode *b;
+	int gotzero = 0;
+	int base = 10;
+	int neg = 0;
+
+	if (ctx->data[ctx->off] == '-') {
+		neg = 1;
+		ctx->off++;
+	}
+	if (ctx->off == ctx->len)
+		return insufficient_ptr(ctx);
+
+	if (ctx->data[ctx->off] == '0') {
+		buf[pos] = '0';
+		pos++;
+		ctx->off++;
+		gotzero = 1;
+	}
+
+	if (gotzero) {
+		if (ctx->off == ctx->len) {
+			ll = 0;
+			goto returnwithval;
+		}
+		if (ctx->data[ctx->off] == 'x') {
+			pos = 0;
+			base = 16;
+			ctx->off++;
+			if (ctx->off == ctx->len)
+				return insufficient_ptr(ctx);
+		} else if (isdigit(ctx->data[ctx->off])) {
+			base = 8;
+		}
+	} else {
+		if (ctx->off == ctx->len)
+			return insufficient_ptr(ctx);
+	}
+
+	while (ctx->off < ctx->len && pos < sizeof buf) {
+		char c = ctx->data[ctx->off];
+		if (base == 16) {
+			if (!isxdigit(c))
+				break;
+		} else {
+			if (!isdigit(c))
+				break;
+		}
+		buf[pos] = c;
+		pos++;
+		ctx->off++;
+	}
+	if (pos == 0 || pos == sizeof buf)
+		return invalid_ptr(ctx);
+	buf[pos] = 0;
+	ll = strtoll(buf, &end, base);
+	if (*end != 0)
+		return invalid_ptr(ctx);
+
+returnwithval:
+	if (neg)
+		ll = -ll;
+	b = ben_int(ll);
+	if (b == NULL)
+		return oom_ptr(ctx);
+	return b;
+}
+
+static struct bencode *decode_printed_list(struct decode *ctx)
+{
+	struct bencode *l = ben_list();
+	int requirecomma = 0;
+	struct bencode *b;
+
+	if (l == NULL)
+		return oom_ptr(ctx);
+
+	ctx->off++;
+
+	while (ctx->off < ctx->len) {
+		if (seek_char(ctx)) {
+			ben_free(l);
+			return NULL;
+		}
+		if (ctx->data[ctx->off] == ']') {
+			ctx->off++;
+			break;
+		}
+		if (requirecomma) {
+			if (ctx->data[ctx->off] != ',') {
+				ben_free(l);
+				return invalid_ptr(ctx);
+			}
+			ctx->off++;
+			requirecomma = 0;
+		} else {
+			b = decode_printed(ctx);
+			if (b == NULL) {
+				ben_free(l);
+				return NULL;
+			}
+			if (ben_list_append(l, b)) {
+				ben_free(l);
+				return oom_ptr(ctx);
+			}
+			requirecomma = 1;
+		}
+	}
+	return l;
+}
+
+static struct bencode *decode_printed_str(struct decode *ctx)
+{
+	size_t pos;
+	char *s = NULL;
+	size_t len = 0;
+	char initial = ctx->data[ctx->off];
+	struct bencode *b;
+
+	ctx->off++;
+	pos = ctx->off;
+	while (pos < ctx->len) {
+		char c = ctx->data[pos];
+		if (!isprint(c))
+			return invalid_ptr(ctx);
+		if (c == initial)
+			break;
+		len++;
+		pos++;
+		if (c != '\\')
+			continue; /* Normal printable char, e.g. 'a' */
+		/* Handle '\\' */
+		if (pos == ctx->len)
+			return insufficient_ptr(ctx);
+
+		c = ctx->data[pos];
+		pos++;
+		if (c == 'x') {
+			/* hexadecimal value: \xHH */
+			pos += 2;
+		}
+	}
+	if (pos >= ctx->len)
+		return insufficient_ptr(ctx);
+
+	s = malloc(len + 1);
+	if (s == NULL)
+		return oom_ptr(ctx);
+
+	pos = 0;
+	while (ctx->off < ctx->len) {
+		char c = ctx->data[ctx->off];
+		assert(isprint(c));
+		if (c == initial)
+			break;
+		assert(pos < len);
+		ctx->off++;
+		if (c != '\\') {
+			s[pos] = c;
+			pos++;
+			continue; /* Normal printable char, e.g. 'a' */
+		}
+		/* Handle '\\' */
+		assert(ctx->off != ctx->len);
+		c = ctx->data[ctx->off];
+		ctx->off++;
+		if (c == 'x') {
+			/* hexadecimal value: \xHH */
+			char *end;
+			unsigned long x;
+			char buf[3];
+			assert((ctx->off + 1) < ctx->len);
+			buf[0] = ctx->data[ctx->off + 0];
+			buf[1] = ctx->data[ctx->off + 1];
+			buf[2] = 0;
+			ctx->off += 2;
+			x = strtoul(buf, &end, 16);
+			if (*end != 0)
+				goto invalid;
+			assert(x < 256);
+			c = (char) x;
+		}
+		s[pos] = c;
+		pos++;
+	}
+	assert(pos == len);
+	if (ctx->off >= ctx->len)
+		return insufficient_ptr(ctx);
+	ctx->off++;
+
+	s[pos] = 0; /* the area must always be zero terminated! */
+
+	b = internal_blob(s, len);
+	if (b == NULL) {
+		free(s);
+		return oom_ptr(ctx);
+	}
+	return b;
+
+invalid:
+	free(s);
+	return invalid_ptr(ctx);
+}
+
+static struct bencode *decode_printed(struct decode *ctx)
+{
+	struct bencode *b;
+
+	ctx->level++;
+	if (ctx->level > 256)
+		return invalid_ptr(ctx);
+	
+	if (seek_char(ctx))
+		return NULL;
+
+	switch (ctx->data[ctx->off]) {
+	case '\'':
+	case '"':
+		b = decode_printed_str(ctx);
+		break;
+	case '-':
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		b = decode_printed_int(ctx);
+		break;
+	case 'F':
+	case 'T':
+		b = decode_printed_bool(ctx);
+		break;
+	case '[':
+		b = decode_printed_list(ctx);
+		break;
+	case '{':
+		b = decode_printed_dict(ctx);
+		break;
+	default:
+		return invalid_ptr(ctx);
+	}
+	ctx->level--;
+	return b;
+}
+
+struct bencode *ben_decode_printed(const void *data, size_t len)
+{
+	struct decode ctx = {.data = data, .len = len};
+	return decode_printed(&ctx);
+}
+
+struct bencode *ben_decode_printed2(const void *data, size_t len, size_t *off, struct bencode_error *error)
+{
+	struct decode ctx = {.data = data, .len = len, .off = *off};
+	struct bencode *b = decode_printed(&ctx);
+	*off = ctx.off;
+	if (error != NULL) {
+		assert((b != NULL) ^ (ctx.error != 0));
+		error->error = ctx.error;
+		if (b != NULL) {
+			error->off = 0;
+			error->line = 0;
+		} else {
+			error->off = ctx.off;
+			error->line = ctx.line;
+		}
 	}
 	return b;
 }
