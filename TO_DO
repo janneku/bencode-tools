@@ -1,7 +1,5 @@
 * Implement max recursion level for bdecode (Python)
-* ben_list_pop()
-* char *ben_dict_get_str_by_str()
-* const char *ben_list_get_str(), char *ben_list_pop_str()
 * ben_alloc() for lists and dictionaries
 * ben_dict_pop() should decrease the allocated space when decreasing below
   a specific limit
+* Support comments in ben_decode_printed()
