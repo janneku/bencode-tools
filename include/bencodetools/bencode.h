@@ -93,6 +93,8 @@ struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *erro
 /*
  * Same as ben_decode(), but decodes data encoded with ben_print(). This is
  * whitespace tolerant, so intended Python syntax can also be read.
+ * The decoder skips comments that begin with a '#' character.
+ * The comment starts from '#' character and ends at the end of the same line.
  *
  * For example, this can be used to read in config files written as a Python
  * dictionary.

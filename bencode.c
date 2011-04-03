@@ -120,14 +120,31 @@ static char current_char(const struct decode *ctx)
 	return ctx->data[ctx->off];
 }
 
+static void skip_to_next_line(struct decode *ctx)
+{
+	for (; ctx->off < ctx->len; ctx->off++) {
+		if (current_char(ctx) == '\n') {
+			ctx->line++;
+			break;
+		}
+	}
+}
+
 static int seek_char(struct decode *ctx)
 {
 	while (ctx->off < ctx->len) {
-		if (!isspace(ctx->data[ctx->off]))
+		char c = current_char(ctx);
+		if (isspace(c)) {
+			if (c == '\n')
+				ctx->line++;
+			ctx->off++;
+		} else if (c == '#') {
+			/* Skip comment */
+			ctx->off++;
+			skip_to_next_line(ctx);
+		} else {
 			return 0;
-		if (ctx->data[ctx->off] == '\n')
-			ctx->line++;
-		ctx->off++;
+		}
 	}
 	return insufficient(ctx);
 }
