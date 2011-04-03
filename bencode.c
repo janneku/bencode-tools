@@ -1002,16 +1002,12 @@ static void free_dict(struct bencode_dict *d)
 	size_t pos;
 	for (pos = 0; pos < d->n; pos++) {
 		ben_free(d->nodes[pos].key);
-		d->nodes[pos].key = NULL;
 		ben_free(d->nodes[pos].value);
+		d->nodes[pos].key = NULL;
 		d->nodes[pos].value = NULL;
 	}
-	d->n = -1;
-	d->alloc = -1;
 	free(d->buckets);
-	d->buckets = NULL;
 	free(d->nodes);
-	d->nodes = NULL;
 }
 
 static void free_list(struct bencode_list *list)
