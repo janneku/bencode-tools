@@ -590,6 +590,53 @@ static void decode_printed_tests(void)
 	}
 }
 
+static void clone_tests(void)
+{
+	struct bencode *b;
+	struct bencode *c;
+
+	b = ben_list();
+	ben_list_append(b, ben_int(1));
+	ben_list_append(b, ben_int(1));
+	c = ben_clone(b);
+	assert(ben_list_len(c) == 2);
+	ben_free(c);
+	ben_free(b);
+
+	b = ben_dict();
+	ben_dict_set_str_by_str(b, "foo0", "a");
+	ben_dict_set_str_by_str(b, "foo1", "b");
+	ben_dict_set_str_by_str(b, "foo2", "c");
+	c = ben_clone(b);
+	assert(ben_dict_get_by_str(c, "foo0") != NULL);
+	assert(ben_dict_get_by_str(c, "foo1") != NULL);
+	assert(ben_dict_get_by_str(c, "foo2") != NULL);
+	assert(ben_dict_len(c) == 3);
+	ben_free(c);
+	ben_free(b);
+
+	b = ben_int(666);
+	c = ben_clone(b);
+	assert(ben_int_val(c) == ben_int_val(b));
+	ben_free(c);
+	ben_free(b);
+
+	b = ben_str("foo");
+	c = ben_clone(b);
+	if (strcmp(ben_str_val(b), ben_str_val(c)) != 0) {
+		fprintf(stderr, "Cloned strings are different\n");
+		abort();
+	}
+	ben_free(c);
+	ben_free(b);
+
+	b = ben_bool(1);
+	c = ben_clone(b);
+	assert(ben_bool_val(b) == ben_bool_val(c));
+	ben_free(c);
+	ben_free(b);
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -656,6 +703,8 @@ int main(void)
 	list_tests();
 
 	decode_printed_tests();
+
+	clone_tests();
 
 	return 0;
 }

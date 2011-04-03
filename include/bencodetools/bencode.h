@@ -110,6 +110,12 @@ struct bencode *ben_decode_printed(const void *data, size_t len);
 struct bencode *ben_decode_printed2(const void *data, size_t len, size_t *off, struct bencode_error *error);
 
 /*
+ * Returns an identical but a separate copy of structure b. Returns NULL if
+ * there is no memory to make a copy. The copy is made recursively.
+ */
+struct bencode *ben_clone(const struct bencode *b);
+
+/*
  * ben_cmp() is similar to strcmp(), but compares both integers and strings.
  * An integer is always less than a string.
  *

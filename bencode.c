@@ -185,6 +185,125 @@ static int try_match_with_errors(struct decode *ctx, const char *s)
 	return 0;
 }
 
+static struct bencode *clone_dict(const struct bencode_dict *d)
+{
+	struct bencode *key;
+	struct bencode *value;
+	struct bencode *newkey;
+	struct bencode *newvalue;
+	size_t pos;
+	struct bencode *newdict = ben_dict();
+	if (newdict == NULL)
+		return NULL;
+	ben_dict_for_each(key, value, pos, d) {
+		newkey = ben_clone(key);
+		newvalue = ben_clone(value);
+		if (newkey == NULL || newvalue == NULL) {
+			ben_free(newkey);
+			ben_free(newvalue);
+			goto error;
+		}
+		if (ben_dict_set(newdict, newkey, newvalue)) {
+			ben_free(newkey);
+			ben_free(newvalue);
+			goto error;
+		}
+		newkey = NULL;
+		newvalue = NULL;
+	}
+	return (struct bencode *) newdict;
+
+error:
+	ben_free(newdict);
+	return NULL;
+}
+
+static struct bencode *clone_list(const struct bencode_list *list)
+{
+	struct bencode *value;
+	struct bencode *newvalue;
+	size_t pos;
+	struct bencode *newlist = ben_list();
+	if (newlist == NULL)
+		return NULL;
+	ben_list_for_each(value, pos, list) {
+		newvalue = ben_clone(value);
+		if (newvalue == NULL)
+			goto error;
+		if (ben_list_append(newlist, newvalue)) {
+			ben_free(newvalue);
+			goto error;
+		}
+		newvalue = NULL;
+	}
+	return (struct bencode *) newlist;
+
+error:
+	ben_free(newlist);
+	return NULL;
+}
+
+static struct bencode *clone_str(const struct bencode_str *s)
+{
+	return ben_blob(s->s, s->len);
+}
+
+struct bencode *ben_clone(const struct bencode *b)
+{
+	switch (b->type) {
+	case BENCODE_BOOL:
+		return ben_bool(ben_bool_const_cast(b)->b);
+	case BENCODE_DICT:
+		return clone_dict(ben_dict_const_cast(b));
+	case BENCODE_INT:
+		return ben_int(ben_int_const_cast(b)->ll);
+	case BENCODE_LIST:
+		return clone_list(ben_list_const_cast(b));
+	case BENCODE_STR:
+		return clone_str(ben_str_const_cast(b));
+	default:
+		die("Invalid type %c\n", b->type);
+	}	
+}
+
+int ben_cmp(const struct bencode *a, const struct bencode *b)
+{
+	size_t cmplen;
+	int ret;
+	const struct bencode_str *sa;
+	const struct bencode_str *sb;
+
+	if (a->type != b->type)
+		return (a->type == BENCODE_INT) ? -1 : 1;
+
+	if (a->type == BENCODE_INT) {
+		const struct bencode_int *ia = ben_int_const_cast(a);
+		const struct bencode_int *ib = ben_int_const_cast(b);
+		if (ia->ll < ib->ll)
+			return -1;
+		if (ib->ll < ia->ll)
+			return 1;
+		return 0;
+	}
+
+	sa = ben_str_const_cast(a);
+	sb = ben_str_const_cast(b);
+	cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
+	ret = memcmp(sa->s, sb->s, cmplen);
+	if (sa->len == sb->len)
+		return ret;
+	if (ret)
+		return ret;
+	return (sa->len < sb->len) ? -1 : 1;
+}
+
+int ben_cmp_qsort(const void *a, const void *b)
+{
+	const struct bencode *akey = ((const struct bencode_keyvalue *) a)->key;
+	const struct bencode *bkey = ((const struct bencode_keyvalue *) b)->key;
+	return ben_cmp(akey, bkey);
+}
+
 static struct bencode *decode_bool(struct decode *ctx)
 {
 	struct bencode_bool *b;
@@ -262,44 +381,6 @@ static int resize_dict(struct bencode_dict *d)
 	}
 
 	return 0;
-}
-
-int ben_cmp(const struct bencode *a, const struct bencode *b)
-{
-	size_t cmplen;
-	int ret;
-	const struct bencode_str *sa;
-	const struct bencode_str *sb;
-
-	if (a->type != b->type)
-		return (a->type == BENCODE_INT) ? -1 : 1;
-
-	if (a->type == BENCODE_INT) {
-		const struct bencode_int *ia = ben_int_const_cast(a);
-		const struct bencode_int *ib = ben_int_const_cast(b);
-		if (ia->ll < ib->ll)
-			return -1;
-		if (ib->ll < ia->ll)
-			return 1;
-		return 0;
-	}
-
-	sa = ben_str_const_cast(a);
-	sb = ben_str_const_cast(b);
-	cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
-	ret = memcmp(sa->s, sb->s, cmplen);
-	if (sa->len == sb->len)
-		return ret;
-	if (ret)
-		return ret;
-	return (sa->len < sb->len) ? -1 : 1;
-}
-
-int ben_cmp_qsort(const void *a, const void *b)
-{
-	const struct bencode *akey = ((const struct bencode_keyvalue *) a)->key;
-	const struct bencode *bkey = ((const struct bencode_keyvalue *) b)->key;
-	return ben_cmp(akey, bkey);
 }
 
 /* The string/binary object hash is copied from Python */
