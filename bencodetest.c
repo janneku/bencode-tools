@@ -197,6 +197,13 @@ static void print_tests(void)
 	}
 }
 
+static size_t test_encoded_size(struct bencode *b)
+{
+	size_t s = ben_encoded_size(b);
+	ben_free(b);
+	return s;
+}
+
 static void encoded_size_tests(void)
 {
 	struct bencode *key;
@@ -209,16 +216,16 @@ static void encoded_size_tests(void)
 	size_t pos;
 	size_t n;
 
-	assert(ben_encoded_size(ben_bool(0)) == 2);
-	assert(ben_encoded_size(ben_bool(1)) == 2);
+	assert(test_encoded_size(ben_bool(0)) == 2);
+	assert(test_encoded_size(ben_bool(1)) == 2);
 
-	assert(ben_encoded_size(ben_int(-10)) == 5);
-	assert(ben_encoded_size(ben_int(-1)) == 4);
-	assert(ben_encoded_size(ben_int(0)) == 3);
-	assert(ben_encoded_size(ben_int(1)) == 3);
-	assert(ben_encoded_size(ben_int(10)) == 4);
+	assert(test_encoded_size(ben_int(-10)) == 5);
+	assert(test_encoded_size(ben_int(-1)) == 4);
+	assert(test_encoded_size(ben_int(0)) == 3);
+	assert(test_encoded_size(ben_int(1)) == 3);
+	assert(test_encoded_size(ben_int(10)) == 4);
 
-	assert(ben_encoded_size(ben_str("marklar")) == 9);
+	assert(test_encoded_size(ben_str("marklar")) == 9);
 
 	l = ben_list();
 	assert(ben_encoded_size(l) == 2);
@@ -341,7 +348,6 @@ static void dict_tests(void)
 	struct bencode *value;
 	size_t pos;
 
-	assert(d != NULL && i != NULL && key2 != NULL && i2 != NULL);
 	assert(ben_dict_set_by_str(d, "key", i) == 0);
 	assert(ben_dict_get_by_str(d, "key") != NULL);
 	assert(ben_dict_set(d, key2, i2) == 0);
@@ -357,6 +363,7 @@ static void dict_tests(void)
 			ben_free(ben_dict_pop_current(d, &pos));
 	}
 	assert(ben_dict_len(d) == 2);
+	ben_free(d);
 }
 
 static void dict_tests_2(void)
@@ -372,7 +379,6 @@ static void dict_tests_2(void)
 
 	srandom(666);
 	d = ben_dict();
-	assert(d != NULL);
 	for (i = 0; i < n; i++) {
 		llkey = random();
 		assert(ben_dict_set(d, ben_int(llkey), ben_str("foo")) == 0);
@@ -385,7 +391,6 @@ static void dict_tests_2(void)
 	ben_free(d);
 
 	d = ben_dict();
-	assert(d != NULL);
 	for (i = 0; i < n; i++) {
 		llkey = i;
 		assert(ben_dict_set(d, ben_int(llkey), ben_str("foo")) == 0);
@@ -400,14 +405,15 @@ static void dict_tests_2(void)
 		assert(value != NULL);
 	}
 	for (i = 0; i < n; i++) {
-		value = ben_dict_pop(d, ben_int(i));
+		key = ben_int(i);
+		value = ben_dict_pop(d, key);
 		assert(value != NULL);
+		ben_free(key);
 		ben_free(value);
 	}
 	ben_free(d);
 
 	d = ben_dict();
-	assert(d != NULL);
 	for (i = 0; i < n; i++) {
 		char skey[32];
 		snprintf(skey, sizeof skey, "%d", i);
@@ -444,13 +450,18 @@ static void list_tests(void)
 	assert(!ben_list_append_str(l, "bar0"));
 	assert(!ben_list_append_str(l, "foo1"));
 	assert(!ben_list_append_str(l, "foo2"));
-	assert(ben_list_pop(l, 3) != NULL);
+
+	value = ben_list_pop(l, 3);
+	assert(value != NULL);
+	ben_free(value);
 	assert(ben_list_len(l) == 3);
+
 	ben_list_for_each(value, pos, l) {
 		if (strncmp(ben_str_val(value), "foo", 3) != 0)
 			ben_free(ben_list_pop_current(l, &pos));
 	}
 	assert(ben_list_len(l) == 2);
+	ben_free(l);
 }
 
 static void decode_printed_tests(void)
