@@ -116,7 +116,7 @@ struct bencode *ben_decode_printed2(const void *data, size_t len, size_t *off, s
 struct bencode *ben_clone(const struct bencode *b);
 
 /*
- * ben_cmp() is similar to strcmp(), but compares both integers and strings.
+ * ben_cmp() is similar to strcmp(). It compares both integers and strings.
  * An integer is always less than a string.
  *
  * ben_cmp(a, b) returns -1 if a < b, 0 if a == b, and 1 if a > b.
