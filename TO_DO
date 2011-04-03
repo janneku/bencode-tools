@@ -1,4 +1,3 @@
 * Implement max recursion level for bdecode (Python)
-* ben_alloc() for lists and dictionaries
 * ben_dict_pop() should decrease the allocated space when decreasing below
   a specific limit

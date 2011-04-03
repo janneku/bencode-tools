@@ -637,6 +637,30 @@ static void clone_tests(void)
 	ben_free(b);
 }
 
+static void alloc_tests(void)
+{
+	struct bencode *list;
+	struct bencode *dict;
+
+	list = ben_list();
+	assert(ben_allocate(list, 1) == 0);
+	assert(ben_list_cast(list)->alloc == 1);
+	assert(ben_allocate(list, 64) == 0);
+	assert(ben_list_cast(list)->alloc == 64);
+	assert(ben_allocate(list, 1) == 0);
+	assert(ben_list_cast(list)->alloc == 1);
+	ben_free(list);
+
+	dict = ben_dict();
+	assert(ben_allocate(dict, 1) == 0);
+	assert(ben_dict_cast(dict)->alloc == 1);
+	assert(ben_allocate(dict, 64) == 0);
+	assert(ben_dict_cast(dict)->alloc == 64);
+	assert(ben_allocate(dict, 1) == 0);
+	assert(ben_dict_cast(dict)->alloc == 1);
+	ben_free(dict);
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -705,6 +729,8 @@ int main(void)
 	decode_printed_tests();
 
 	clone_tests();
+
+	alloc_tests();
 
 	return 0;
 }

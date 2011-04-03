@@ -37,6 +37,8 @@ struct bencode_keyvalue {
 
 static struct bencode *decode(struct decode *ctx);
 static struct bencode *decode_printed(struct decode *ctx);
+static int resize_dict(struct bencode_dict *d, size_t newalloc);
+static int resize_list(struct bencode_list *list, size_t newalloc);
 
 static size_t type_size(int type)
 {
@@ -183,6 +185,18 @@ static int try_match_with_errors(struct decode *ctx, const char *s)
 
 	ctx->off += n;
 	return 0;
+}
+
+int ben_allocate(struct bencode *b, size_t n)
+{
+	switch (b->type) {
+	case BENCODE_DICT:
+		return resize_dict(ben_dict_cast(b), n);
+	case BENCODE_LIST:
+		return resize_list(ben_list_cast(b), n);
+	default:
+		die("ben_allocate(): Unknown type %d\n", b->type);
+	}
 }
 
 static struct bencode *clone_dict(const struct bencode_dict *d)
@@ -339,20 +353,33 @@ static size_t hash_bucket_head(long long hash, const struct bencode_dict *d)
 	return d->buckets[hash_bucket(hash, d)];
 }
 
-static int resize_dict(struct bencode_dict *d)
+static int resize_dict(struct bencode_dict *d, size_t newalloc)
 {
 	size_t *newbuckets;
 	struct bencode_dict_node *newnodes;;
-	size_t newalloc;
 	size_t pos;
 
-	if (d->alloc >= DICT_MAX_ALLOC)
-		return -1;
+	if (newalloc == -1) {
+		if (d->alloc >= DICT_MAX_ALLOC)
+			return -1;
 
-	if (d->alloc == 0)
-		newalloc = 4;
-	else
-		newalloc = d->alloc * 2;
+		if (d->alloc == 0)
+			newalloc = 4;
+		else
+			newalloc = d->alloc * 2;
+	} else {
+		size_t x;
+		if (newalloc < d->n || newalloc > DICT_MAX_ALLOC)
+			return -1;
+		/* Round to next power of two */
+		x = 1;
+		while (x < newalloc)
+			x <<= 1;
+		assert(x >= newalloc);
+		newalloc = x;
+		if (newalloc > DICT_MAX_ALLOC)
+			return -1;		
+	}
 
 	/* size must be a power of two */
 	assert((newalloc & (newalloc - 1)) == 0);
@@ -440,7 +467,7 @@ static struct bencode *decode_dict(struct decode *ctx)
 	ctx->off += 1;
 
 	while (ctx->off < ctx->len && current_char(ctx) != 'e') {
-		if (d->n == d->alloc && resize_dict(d)) {
+		if (d->n == d->alloc && resize_dict(d, -1)) {
 			warn("Can not resize dict\n");
 			ctx->error = BEN_NO_MEMORY;
 			goto error;
@@ -550,19 +577,23 @@ static struct bencode *decode_int(struct decode *ctx)
 	return (struct bencode *) b;
 }
 
-static int resize_list(struct bencode_list *list)
+static int resize_list(struct bencode_list *list, size_t newalloc)
 {
 	struct bencode **newvalues;
-	size_t newalloc;
 	size_t newsize;
 
-	if (list->alloc >= MAX_ALLOC)
-		return -1;
+	if (newalloc == -1) {
+		if (list->alloc >= MAX_ALLOC)
+			return -1;
+		if (list->alloc == 0)
+			newalloc = 4;
+		else
+			newalloc = list->alloc * 2;
+	} else {
+		if (newalloc < list->n || newalloc > MAX_ALLOC)
+			return -1;
+	}
 
-	if (list->alloc == 0)
-		newalloc = 4;
-	else
-		newalloc = list->alloc * 2;
 	newsize = sizeof(list->values[0]) * newalloc;
 	newvalues = realloc(list->values, newsize);
 	if (newvalues == NULL)
@@ -1745,7 +1776,7 @@ int ben_dict_set(struct bencode *dict, struct bencode *key, struct bencode *valu
 	}
 
 	assert(d->n <= d->alloc);
-	if (d->n == d->alloc && resize_dict(d))
+	if (d->n == d->alloc && resize_dict(d, -1))
 		return -1;
 
 	bucket = hash_bucket(hash, d);
@@ -1807,7 +1838,7 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 	struct bencode_list *l = ben_list_cast(list);
 	/* NULL pointer de-reference if the cast fails */
 	assert(l->n <= l->alloc);
-	if (l->n == l->alloc && resize_list(l))
+	if (l->n == l->alloc && resize_list(l, -1))
 		return -1;
 	assert(b != NULL);
 	l->values[l->n] = b;

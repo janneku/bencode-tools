@@ -68,6 +68,40 @@ struct bencode_error {
 };
 
 /*
+ * Try to set capacity of a list or a dict to 'n' objects.
+ * The function does nothing if 'n' is less than or equal to the number of
+ * objects in 'b'. That is, nothing happens if n <= ben_{dict|list}_len(b).
+ *
+ * This function is used only for advice. The implementation need not obey it.
+ *
+ * The function returns 0 if the new capacity is used, otherwise -1.
+ *
+ * Note: This can be used to make construction of lists and dicts
+ * more efficient when the number of inserted items is known in advance.
+ */
+int ben_allocate(struct bencode *b, size_t n);
+
+/*
+ * Returns an identical but a separate copy of structure b. Returns NULL if
+ * there is no memory to make a copy. The copy is made recursively.
+ */
+struct bencode *ben_clone(const struct bencode *b);
+
+/*
+ * ben_cmp() is similar to strcmp(). It compares both integers and strings.
+ * An integer is always less than a string.
+ *
+ * ben_cmp(a, b) returns -1 if a < b, 0 if a == b, and 1 if a > b.
+ */
+int ben_cmp(const struct bencode *a, const struct bencode *b);
+
+/*
+ * Comparison function suitable for qsort(). Uses ben_cmp(), so this can be
+ * used to order both integer and string arrays.
+ */
+int ben_cmp_qsort(const void *a, const void *b);
+
+/*
  * Decode 'data' with 'len' bytes of data. Returns NULL on error.
  * The encoded data must be exactly 'len' bytes (not less), otherwise NULL
  * is returned. ben_decode2() function supports partial decoding ('len' is
@@ -108,26 +142,6 @@ struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *erro
  */
 struct bencode *ben_decode_printed(const void *data, size_t len);
 struct bencode *ben_decode_printed2(const void *data, size_t len, size_t *off, struct bencode_error *error);
-
-/*
- * Returns an identical but a separate copy of structure b. Returns NULL if
- * there is no memory to make a copy. The copy is made recursively.
- */
-struct bencode *ben_clone(const struct bencode *b);
-
-/*
- * ben_cmp() is similar to strcmp(). It compares both integers and strings.
- * An integer is always less than a string.
- *
- * ben_cmp(a, b) returns -1 if a < b, 0 if a == b, and 1 if a > b.
- */
-int ben_cmp(const struct bencode *a, const struct bencode *b);
-
-/*
- * Comparison function suitable for qsort(). Uses ben_cmp(), so this can be
- * used to order both integer and string arrays.
- */
-int ben_cmp_qsort(const void *a, const void *b);
 
 /* Get the serialization size of bencode structure 'b' */
 size_t ben_encoded_size(const struct bencode *b);
