@@ -125,12 +125,56 @@ static int seek_char(struct decode *ctx)
 	return insufficient(ctx);
 }
 
+static int need_bytes(struct decode *ctx, size_t n)
+{
+	return ((ctx->off + n) <= ctx->len) ? 0 : -1;
+}
+
+/*
+ * Test if string 's' is located at current position.
+ * Increment current position and return 0 if the string matches.
+ * Returns -1 otherwise. The function avoids buffer overflow.
+ */
+static int try_match(struct decode *ctx, const char *s)
+{
+	size_t n = strlen(s);
+	if (need_bytes(ctx, n))
+		return -1;
+	if (memcmp(ctx->data + ctx->off, s, n) != 0)
+		return -1;
+	ctx->off += n;
+	return 0;
+}
+
+static int try_match_with_errors(struct decode *ctx, const char *s)
+{
+	size_t n = strlen(s);
+	size_t left = ctx->len - ctx->off;
+
+	assert(ctx->off <= ctx->len);
+
+	if (left == 0)
+		return insufficient(ctx);
+
+	if (left < n) {
+		if (memcmp(ctx->data + ctx->off, s, left) != 0)
+			return invalid(ctx);
+		return insufficient(ctx);
+	}
+
+	if (memcmp(ctx->data + ctx->off, s, n) != 0)
+		return invalid(ctx);
+
+	ctx->off += n;
+	return 0;
+}
+
 static struct bencode *decode_bool(struct decode *ctx)
 {
 	struct bencode_bool *b;
 	char value;
 	char c;
-	if ((ctx->off + 2) > ctx->len)
+	if (need_bytes(ctx, 2))
 		return insufficient_ptr(ctx);
 
 	c = ctx->data[ctx->off + 1];
@@ -481,7 +525,7 @@ static struct bencode *decode_str(struct decode *ctx)
 	if (datalen == -1)
 		return NULL;
 
-	if ((ctx->off + datalen) > ctx->len)
+	if (need_bytes(ctx, datalen))
 		return insufficient_ptr(ctx);
 
 	/* Allocate string structure and copy data into it */
@@ -560,23 +604,21 @@ static struct bencode *decode_printed_bool(struct decode *ctx)
 {
 	struct bencode *b;
 	int bval = -1;
-	if ((ctx->off + 3) >= ctx->len)
-		return insufficient_ptr(ctx);
-	if (memcmp(ctx->data + ctx->off, "True", 4) == 0) {
+
+	if (try_match(ctx, "True")) {	
+		if (need_bytes(ctx, 4))
+			return insufficient_ptr(ctx);
+	} else {
 		bval = 1;
-		ctx->off += 4;
 	}
+
 	if (bval < 0) {
 		/* It's not 'True', so it can only be 'False'. Verify it. */
-		if (memcmp(ctx->data + ctx->off, "Fals", 4) != 0)
-			return invalid_ptr(ctx);
-		if ((ctx->off + 4) >= ctx->len)
-			return insufficient_ptr(ctx);
-		if (ctx->data[ctx->off + 4] != 'e')
-			return invalid_ptr(ctx);
+		if (try_match_with_errors(ctx, "False"))
+			return NULL;
 		bval = 0;
-		ctx->off += 5;
 	}
+
 	assert(bval == 0 || bval == 1);
 	b = ben_bool(bval);
 	if (b == NULL)
