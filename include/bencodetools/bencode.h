@@ -311,7 +311,7 @@ static inline struct bencode *ben_list_get(const struct bencode *list, size_t i)
 {
 	const struct bencode_list *l = ben_list_const_cast(list);
 	if (i >= l->n) {
-		fprintf(stderr, "bencodetools: List index out of bounds\n");
+		fprintf(stderr, "bencode: List index out of bounds\n");
 		abort();
 	}
 	return l->values[i];

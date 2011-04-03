@@ -7,6 +7,9 @@
 #include <errno.h>
 #include <ctype.h>
 
+#define bendie(fmt, args...) do { fprintf(stderr, "bencode: fatal error: " fmt, ## args); abort(); } while (0)
+#define benwarn(fmt, args...) do { fprintf(stderr, "bencode: " fmt, ## args); } while (0)
+
 #define MAX_ALLOC (((size_t) -1) / sizeof(struct bencode *) / 2)
 #define DICT_MAX_ALLOC (((size_t) -1) / sizeof(struct bencode_dict_node) / 2)
 
@@ -58,8 +61,7 @@ static size_t type_size(int type)
 	case BENCODE_STR:
 		return sizeof(struct bencode_str);
 	default:
-		fprintf(stderr, "Unknown bencode type: %d\n", type);
-		abort();
+		bendie("Unknown type: %d\n", type);
 	}
 }
 
@@ -328,8 +330,7 @@ long long ben_hash(const struct bencode *b)
 	case BENCODE_STR:
 		return ben_str_hash(b);
 	default:
-		fprintf(stderr, "bencode: hash: Invalid type: %d\n", b->type);
-		abort();
+		bendie("hash: Invalid type: %d\n", b->type);
 	}		
 }
 
@@ -342,7 +343,7 @@ static struct bencode *decode_dict(struct decode *ctx)
 
 	d = alloc(BENCODE_DICT);
 	if (d == NULL) {
-		fprintf(stderr, "bencode: Not enough memory for dict\n");
+		benwarn("Not enough memory for dict\n");
 		return oom_ptr(ctx);
 	}
 
@@ -350,7 +351,7 @@ static struct bencode *decode_dict(struct decode *ctx)
 
 	while (ctx->off < ctx->len && current_char(ctx) != 'e') {
 		if (d->n == d->alloc && resize_dict(d)) {
-			fprintf(stderr, "bencode: Can not resize dict\n");
+			benwarn("Can not resize dict\n");
 			ctx->error = BEN_NO_MEMORY;
 			goto error;
 		}
@@ -361,7 +362,7 @@ static struct bencode *decode_dict(struct decode *ctx)
 			ben_free(key);
 			key = NULL;
 			ctx->error = BEN_INVALID;
-			fprintf(stderr, "bencode: Invalid dict key type\n");
+			benwarn("Invalid dict key type\n");
 			goto error;
 		}
 
@@ -691,8 +692,7 @@ static struct bencode *decode_printed_dict(struct decode *ctx)
 			dictstate = 0;
 			break;
 		default:
-			fprintf(stderr, "bencode: Invalid dictstate: %d\n", dictstate);
-			abort();
+			bendie("Invalid dictstate: %d\n", dictstate);
 		}
 	}
 
@@ -1108,7 +1108,7 @@ static int print(char *data, size_t size, size_t *pos, const struct bencode *b)
 
 		pairs = malloc(dict->n * sizeof(pairs[0]));
 		if (pairs == NULL) {
-			fprintf(stderr, "bencode: No memory for dict serialization\n");
+			benwarn("No memory for dict serialization\n");
 			return -1;
 		}
 		for (i = 0; i < dict->n; i++) {
@@ -1181,8 +1181,7 @@ static int print(char *data, size_t size, size_t *pos, const struct bencode *b)
 		}
 		return putonechar(data, size, pos, '\'');
 	default:
-		fprintf(stderr, "bencode: serialization type %d not implemented\n", b->type);
-		abort();
+		bendie("serialization type %d not implemented\n", b->type);
 	}
 }
 
@@ -1247,8 +1246,7 @@ static size_t get_printed_size(const struct bencode *b)
 		size += 1; /* ' */
 		return size;
 	default:
-		fprintf(stderr, "bencode: invalid bencode type: %c\n", b->type);
-		abort();
+		bendie("Unknown type: %c\n", b->type);
 	}
 }
 
@@ -1279,7 +1277,7 @@ static int serialize(char *data, size_t size, size_t *pos,
 
 		pairs = malloc(dict->n * sizeof(pairs[0]));
 		if (pairs == NULL) {
-			fprintf(stderr, "bencode: No memory for dict serialization\n");
+			benwarn("No memory for dict serialization\n");
 			return -1;
 		}
 		for (i = 0; i < dict->n; i++) {
@@ -1334,8 +1332,7 @@ static int serialize(char *data, size_t size, size_t *pos,
 		return 0;
 
 	default:
-		fprintf(stderr, "bencode: serialization type %d not implemented\n", b->type);
-		abort();
+		bendie("serialization type %d not implemented\n", b->type);
 	}
 }
 
@@ -1371,8 +1368,7 @@ static size_t get_size(const struct bencode *b)
 		s = ben_str_const_cast(b);
 		return snprintf(buf, 0, "%zu", s->len) + 1 + s->len;
 	default:
-		fprintf(stderr, "bencode: invalid bencode type: %c\n", b->type);
-		abort();
+		bendie("Unknown type: %c\n", b->type);
 	}
 }
 
@@ -1386,7 +1382,7 @@ void *ben_encode(size_t *len, const struct bencode *b)
 	size_t size = get_size(b);
 	void *data = malloc(size);
 	if (data == NULL) {
-		fprintf(stderr, "bencode: No memory to encode\n");
+		benwarn("No memory to encode\n");
 		return NULL;
 	}
 	*len = 0;
@@ -1425,8 +1421,7 @@ void ben_free(struct bencode *b)
 		free(((struct bencode_str *) b)->s);
 		break;
 	default:
-		fprintf(stderr, "bencode: invalid type: %d\n", b->type);
-		abort();
+		bendie("invalid type: %d\n", b->type);
 	}
 
 	memset(b, -1, type_size(b->type)); /* data poison */
@@ -1548,8 +1543,7 @@ static void dict_unlink(struct bencode_dict *d, size_t bucket, size_t unlinkpos)
 		}
 		pos = next;
 	}
-	fprintf(stderr, "Key should have been found. Can not unlink position %zu.\n", unlinkpos);
-	abort();
+	bendie("Key should have been found. Can not unlink position %zu.\n", unlinkpos);
 }
 
 /* Remove node from the linked list, if found */
@@ -1763,10 +1757,9 @@ struct bencode *ben_list_pop(struct bencode *list, size_t pos)
 void ben_list_set(struct bencode *list, size_t i, struct bencode *b)
 {
 	struct bencode_list *l = ben_list_cast(list);
-	if (i >= l->n) {
-		fprintf(stderr, "bencode: ben_list_set() out of bounds: %zu\n", i);
-		abort();
-	}
+	if (i >= l->n)
+		bendie("ben_list_set() out of bounds: %zu\n", i);
+
 	ben_free(l->values[i]);
 	assert(b != NULL);
 	l->values[i] = b;
@@ -1778,7 +1771,7 @@ char *ben_print(const struct bencode *b)
 	char *data = malloc(size + 1);
 	size_t len = 0;
 	if (data == NULL) {
-		fprintf(stderr, "bencode: No memory to print\n");
+		benwarn("No memory to print\n");
 		return NULL;
 	}
 	if (print(data, size, &len, b)) {
