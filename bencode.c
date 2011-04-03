@@ -1021,6 +1021,7 @@ static void free_list(struct bencode_list *list)
 		ben_free(list->values[pos]);
 		list->values[pos] = NULL;
 	}
+	free(list->values);
 }
 
 static int putonechar(char *data, size_t size, size_t *pos, char c)
