@@ -933,7 +933,7 @@ static struct bencode *decode_printed(struct decode *ctx)
 	ctx->level++;
 	if (ctx->level > 256)
 		return invalid_ptr(ctx);
-	
+
 	if (seek_char(ctx))
 		return NULL;
 
