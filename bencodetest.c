@@ -557,7 +557,7 @@ static void decode_printed_tests(void)
 		{.s = "{'a': 'b'\n\n'c'}", .l = 15, .e = BEN_INVALID, .line = 2},
 		{.s = "#bar\n0x1000", .l = 11, .ival = 4096},
 		{.s = "0x1000#foo\n", .l = 11, .ival = 4096},
-		{.s = "#bar\nx0x1000", .l = 12, .ival = 4096, .e = BEN_INVALID, .line = 2},
+		{.s = "#bar\nx0x1000", .l = 12, .ival = 4096, .e = BEN_INVALID, .line = 1},
 
 		{.s = NULL}};
 	int i;

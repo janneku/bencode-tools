@@ -38,15 +38,6 @@ struct bencode_keyvalue {
 static struct bencode *decode(struct decode *ctx);
 static struct bencode *decode_printed(struct decode *ctx);
 
-static size_t find(const char *data, size_t len, size_t off, char c)
-{
-	for (; off < len; off++) {
-		if (data[off] == c)
-			return off;
-	}
-	return -1;
-}
-
 static size_t type_size(int type)
 {
 	switch (type) {
@@ -125,6 +116,7 @@ static void skip_to_next_line(struct decode *ctx)
 	for (; ctx->off < ctx->len; ctx->off++) {
 		if (current_char(ctx) == '\n') {
 			ctx->line++;
+			ctx->off++;
 			break;
 		}
 	}
@@ -414,15 +406,22 @@ error:
 	return NULL;
 }
 
+static size_t find(const struct decode *ctx, char c)
+{
+	char *match = memchr(ctx->data + ctx->off, c, ctx->len - ctx->off);
+	if (match == NULL)
+		return -1;
+	return (size_t) (match - ctx->data);
+}
+
 /* off is the position of first number in */
 static int read_long_long(long long *ll, struct decode *ctx, int c)
 {
 	char buf[LONGLONGSIZE]; /* fits all 64 bit integers */
-	size_t pos;
 	char *endptr;
 	size_t slen;
+	size_t pos = find(ctx, c);
 
-	pos = find(ctx->data, ctx->len, ctx->off, c);
 	if (pos == -1)
 		return insufficient(ctx);
 
