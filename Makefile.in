@@ -1,4 +1,3 @@
-AR = {AR}
 CC = {CC}
 CFLAGS = -Wall -O2 -g -fPIC -shared -Iinclude {CFLAGS}
 EXECFLAGS = -Wall -O2 -g -Iinclude {CFLAGS}

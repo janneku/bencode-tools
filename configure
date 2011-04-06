@@ -35,12 +35,8 @@ fi
 if test -z "$CC" ; then
     CC=gcc
 fi
-if test -z "$AR" ; then
-    AR=ar
-fi
 
 sed -e "s|{PREFIX}|$prefix|g" \
-    -e "s|{AR}|$AR|g" \
     -e "s|{CC}|$CC|g" \
     -e "s|{CFLAGS}|$CFLAGS|g" \
     -e "s|{LDFLAGS}|$LDFLAGS|g" \
@@ -49,6 +45,5 @@ sed -e "s|{PREFIX}|$prefix|g" \
 echo
 echo "Install prefix:  $prefix"
 echo "Compiler:        $CC"
-echo "ar:              $AR"
 echo
 echo "Configure successful"
