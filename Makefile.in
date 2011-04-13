@@ -3,6 +3,7 @@ CFLAGS = -Wall -O2 -g -fPIC -shared -Iinclude {CFLAGS}
 EXECFLAGS = -Wall -O2 -g -Iinclude {CFLAGS}
 LDFLAGS = {LDFLAGS}
 PREFIX = {PREFIX}
+LIBPATH = {LIBPATH}
 
 LIBMODULES = bencode.o
 
@@ -27,7 +28,7 @@ check:	bencodetest
 install:	
 	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/bencodetools" "$(PREFIX)/bin"
 	install -m 644 include/bencodetools/*.h "$(PREFIX)/include/bencodetools/"
-	install -m 644 libbencodetools.so "$(PREFIX)/lib/"
+	install -m 644 libbencodetools.so "$(LIBPATH)"
 	install bencat "$(PREFIX)/bin/"
 
 %.o:	%.c

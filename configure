@@ -1,9 +1,13 @@
 #!/bin/sh
 
 prefix=/usr/local
+libpath=""
 
 for opt in "$@" ; do
 	case $opt in
+	--lib-path=*)
+		libpath=$(echo $opt | sed -n 's/--lib-path=\(.*\)/\1/p')
+		;;
 	--prefix=*)
 		prefix=`echo $opt | sed -n 's/--prefix=\(.*\)/\1/p'`
 		;;
@@ -17,6 +21,7 @@ for opt in "$@" ; do
 	--help)
 		echo ""
 		echo "Valid options are:"
+		echo "--lib-path=dir         Install libraries to 'dir'"
 		echo "--prefix=dir           Install program to prefix 'dir'"
  		echo "--package-prefix=dest  Pretend to install to the prefix,"
 		echo "                       but copy files to 'dest/prefix' on make install"
@@ -28,8 +33,17 @@ for opt in "$@" ; do
 	esac
 done
 
+if test -z "$libpath" ; then
+	if test -d "$prefix/lib64"; then
+		libpath="$prefix/lib64"
+	else
+		libpath="$prefix/lib"
+	fi
+fi
+
 if test ! -z "$packageprefix" ; then
     prefix="$packageprefix/$prefix"
+    libpath="$packageprefix/$libpath"
 fi
 
 if test -z "$CC" ; then
@@ -38,12 +52,14 @@ fi
 
 sed -e "s|{PREFIX}|$prefix|g" \
     -e "s|{CC}|$CC|g" \
+    -e "s|{LIBPATH}|$libpath|g" \
     -e "s|{CFLAGS}|$CFLAGS|g" \
     -e "s|{LDFLAGS}|$LDFLAGS|g" \
     < Makefile.in > Makefile
 
 echo
 echo "Install prefix:  $prefix"
+echo "Library path:    $libpath"
 echo "Compiler:        $CC"
 echo
 echo "Configure successful"
