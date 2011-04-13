@@ -84,9 +84,7 @@ struct bencode_error {
 	size_t off; /* Error offset in bytes from the start */
 };
 
-/*
- * Allocate an instance of user defined type.
- */
+/* Allocate an instance of a user-defined type */
 void *ben_alloc_user(struct bencode_type *type);
 
 /*
@@ -501,26 +499,22 @@ static inline struct bencode *ben_list_pop_current(struct bencode *list, size_t 
  */
 struct bencode *ben_dict_pop_current(struct bencode *dict, size_t *pos);
 
-/*
- * Report an error while decoding. Returns NULL.
- */
+/* Report an error while decoding. Returns NULL. */
 void *ben_insufficient_ptr(struct ben_decode_ctx *ctx);
 void *ben_invalid_ptr(struct ben_decode_ctx *ctx);
 void *ben_oom_ptr(struct ben_decode_ctx *ctx);
 
 /*
- * Test whether the input has n or more than n bytes left while decoding.
+ * Test whether the input has at least n bytes left while decoding.
  * Returns 0 when there is enough bytes left and -1 when there isn't.
  */
 int ben_need_bytes(const struct ben_decode_ctx *ctx, size_t n);
 
-/*
- * Returns the character in current position while decoding.
- */
+/* Returns the character in current position while decoding */
 char ben_current_char(const struct ben_decode_ctx *ctx);
 
 /*
- * Get the next n bytes from the input.
+ * Get the next n bytes from input.
  * Returns pointer to the data or NULL when there aren't enough bytes left.
  */
 const char *ben_current_buf(const struct ben_decode_ctx *ctx, size_t n);
@@ -532,13 +526,13 @@ void ben_skip(struct ben_decode_ctx *ctx, size_t n);
 
 /*
  * Append one character to encoded output. The amount of bytes written to
- * the output must be the same returned by get_size().
+ * the output must be the same as returned by get_size().
  */
 int ben_put_char(struct ben_encode_ctx *ctx, char c);
 
 /*
  * Append data to encoded output. The amount of bytes written to
- * the output must be the same returned by get_size().
+ * the output must be the same as returned by get_size().
  */
 int ben_put_buffer(struct ben_encode_ctx *ctx, const void *buf, size_t len);
 
