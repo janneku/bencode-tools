@@ -5,6 +5,17 @@
 #include <stdio.h>
 #include <string.h>
 
+static void test_encode(const struct bencode *b, const char *s, size_t len)
+{
+	size_t encoded_len = 0;
+	char *data = ben_encode(&encoded_len, b);
+
+	assert(encoded_len <= len);
+	assert(memcmp(data, s, encoded_len) == 0);
+
+	free(data);
+}
+
 static void booltest(const char *s, size_t len, int expected, int experror)
 {
 	struct bencode_bool *b;
@@ -27,6 +38,8 @@ static void booltest(const char *s, size_t len, int expected, int experror)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
+	if (experror == BEN_OK)
+		test_encode((struct bencode *) b, s, len);
 	ben_free((struct bencode *) b);
 }
 
@@ -52,6 +65,8 @@ static void inttest(const char *s, size_t len, long long expected, int experror)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
+	if (experror == BEN_OK)
+		test_encode((struct bencode *) b, s, len);
 	ben_free((struct bencode *) b);
 }
 
@@ -77,6 +92,8 @@ static void strtest(const char *s, size_t len, const char *expected, int experro
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
+	if (experror == BEN_OK)
+		test_encode((struct bencode *) b, s, len);
 	ben_free((struct bencode *) b);
 }
 
@@ -102,6 +119,8 @@ static void listtest(const char *s, size_t len, size_t expected, int experror)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
+	if (experror == BEN_OK)
+		test_encode((struct bencode *) b, s, len);
 	ben_free((struct bencode *) b);
 }
 
@@ -127,6 +146,8 @@ static void dicttest(const char *s, size_t len, size_t expected, int experror)
 		fprintf(stderr, "%s/%zd should have failed\n", s, len);
 		exit(1);
 	}
+	if (experror == BEN_OK)
+		test_encode((struct bencode *) b, s, len);
 	ben_free((struct bencode *) b);
 }
 
@@ -277,6 +298,8 @@ static void testvectors(const char **vec, int success)
 			fprintf(stderr, "test vector %s failed. it should be invalid.\n", *vec);
 			exit(1);
 		}
+		if (success)
+			test_encode(b, *vec, strlen(*vec));
 		ben_free(b);
 		vec++;
 	}
