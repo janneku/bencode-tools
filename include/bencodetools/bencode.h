@@ -64,7 +64,6 @@ struct bencode_str {
 
 struct ben_decode_ctx;
 struct ben_encode_ctx;
-struct bencode_user;
 
 struct bencode_type {
 	size_t size;
