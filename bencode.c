@@ -1256,18 +1256,12 @@ static int print(struct ben_encode_ctx *ctx, const struct bencode *b)
 	const struct bencode_list *list;
 	const struct bencode_str *s;
 	size_t i;
-	int len;
 	struct bencode_keyvalue *pairs;
 
 	switch (b->type) {
 	case BENCODE_BOOL:
 		boolean = ben_bool_const_cast(b);
-		len = boolean->b ? 4 : 5;
-		if (ctx->pos + len > ctx->size)
-			return -1;
-		memcpy(ctx->data + ctx->pos, (len == 4) ? "True" : "False", len);
-		ctx->pos += len;
-		return 0;
+		return putstr(ctx, boolean->b ? "True" : "False");
 
 	case BENCODE_DICT:
 		if (ben_put_char(ctx, '{'))
@@ -1421,6 +1415,7 @@ static size_t get_printed_size(const struct bencode *b)
 
 static int serialize(struct ben_encode_ctx *ctx, const struct bencode *b)
 {
+	const struct bencode_bool *boolean;
 	const struct bencode_dict *dict;
 	const struct bencode_int *integer;
 	const struct bencode_list *list;
@@ -1431,12 +1426,8 @@ static int serialize(struct ben_encode_ctx *ctx, const struct bencode *b)
 
 	switch (b->type) {
 	case BENCODE_BOOL:
-		if ((ctx->pos + 2) > ctx->size)
-			return -1;
-		ctx->data[ctx->pos] = 'b';
-		ctx->data[ctx->pos + 1] = ben_bool_const_cast(b)->b ? '1' : '0';
-		ctx->pos += 2;
-		return 0;
+		boolean = ben_bool_const_cast(b);
+		return putstr(ctx, boolean->b ? "b1" : "b0");
 
 	case BENCODE_DICT:
 		if (ben_put_char(ctx, 'd'))
@@ -1494,11 +1485,7 @@ static int serialize(struct ben_encode_ctx *ctx, const struct bencode *b)
 			return -1;
 		if (ben_put_char(ctx, ':'))
 			return -1;
-		if ((ctx->pos + s->len) > ctx->size)
-			return -1;
-		memcpy(ctx->data + ctx->pos, s->s, s->len);
-		ctx->pos += s->len;
-		return 0;
+		return ben_put_buffer(ctx, s->s, s->len);
 
 	case BENCODE_USER:
 		u = ben_user_const_cast(b);
