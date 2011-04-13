@@ -10,6 +10,7 @@ enum {
 	BENCODE_INT,
 	BENCODE_LIST,
 	BENCODE_STR,
+	BENCODE_USER,
 };
 
 enum {
@@ -61,11 +62,33 @@ struct bencode_str {
 	char *s;
 };
 
+struct ben_decode_ctx;
+struct ben_encode_ctx;
+struct bencode_user;
+
+struct bencode_type {
+	size_t size;
+	struct bencode *(*decode) (struct ben_decode_ctx *ctx);
+	int (*encode) (struct ben_encode_ctx *ctx, const struct bencode *b);
+	size_t (*get_size) (const struct bencode *b);
+	void (*free) (struct bencode *b);
+};
+
+struct bencode_user {
+	char type;
+	struct bencode_type *info;
+};
+
 struct bencode_error {
 	int error;  /* 0 if no errors */
 	int line;   /* Error line: 0 is the first line */
 	size_t off; /* Error offset in bytes from the start */
 };
+
+/*
+ * Allocate an instance of user defined type.
+ */
+void *ben_alloc_user(struct bencode_type *type);
 
 /*
  * Try to set capacity of a list or a dict to 'n' objects.
@@ -123,6 +146,11 @@ struct bencode *ben_decode(const void *data, size_t len);
  * was given for decoding. BEN_NO_MEMORY means decoding ran out of memory.
  */
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *error);
+
+/*
+ * Same as ben_decode2(), but allows one to define user types.
+ */
+struct bencode *ben_decode3(const void *data, size_t len, size_t *off, int *error, struct bencode_type *types[128]);
 
 /*
  * Same as ben_decode(), but decodes data encoded with ben_print(). This is
@@ -261,6 +289,10 @@ static inline int ben_is_str(struct bencode *b)
 {
 	return b->type == BENCODE_STR;
 }
+static inline int ben_is_user(struct bencode *b)
+{
+	return b->type == BENCODE_USER;
+}
 
 /*
  * ben_bool_const_cast(b) returns "(const struct bencode_bool *) b" if the
@@ -314,6 +346,29 @@ static inline const struct bencode_str *ben_str_const_cast(const struct bencode 
 static inline struct bencode_str *ben_str_cast(struct bencode *str)
 {
 	return str->type == BENCODE_STR ? ((struct bencode_str *) str) : NULL;
+}
+
+static inline const struct bencode_user *ben_user_const_cast(const struct bencode *user)
+{
+	return user->type == BENCODE_USER ? ((const struct bencode_user *) user) : NULL;
+}
+static inline struct bencode_user *ben_user_cast(struct bencode *user)
+{
+	return user->type == BENCODE_USER ? ((struct bencode_user *) user) : NULL;
+}
+
+static inline int ben_is_user_type(const struct bencode *b, struct bencode_type *type)
+{
+	return b->type == BENCODE_USER ? ((const struct bencode_user *) b)->info == type : 0;
+}
+
+static inline const void *ben_user_type_const_cast(const struct bencode *b, struct bencode_type *type)
+{
+	return (b->type == BENCODE_USER && ((const struct bencode_user *) b)->info == type) ? b : NULL;
+}
+static inline void *ben_user_type_cast(struct bencode *b, struct bencode_type *type)
+{
+	return (b->type == BENCODE_USER && ((const struct bencode_user *) b)->info == type) ? b : NULL;
 }
 
 /* Return the number of keys in a dictionary 'b' */
@@ -446,5 +501,46 @@ static inline struct bencode *ben_list_pop_current(struct bencode *list, size_t 
  * }
  */
 struct bencode *ben_dict_pop_current(struct bencode *dict, size_t *pos);
+
+/*
+ * Report an error while decoding. Returns NULL.
+ */
+void *ben_insufficient_ptr(struct ben_decode_ctx *ctx);
+void *ben_invalid_ptr(struct ben_decode_ctx *ctx);
+void *ben_oom_ptr(struct ben_decode_ctx *ctx);
+
+/*
+ * Test whether the input has n or more than n bytes left while decoding.
+ * Returns 0 when there is enough bytes left and -1 when there isn't.
+ */
+int ben_need_bytes(const struct ben_decode_ctx *ctx, size_t n);
+
+/*
+ * Returns the character in current position while decoding.
+ */
+char ben_current_char(const struct ben_decode_ctx *ctx);
+
+/*
+ * Get the next n bytes from the input.
+ * Returns pointer to the data or NULL when there aren't enough bytes left.
+ */
+const char *ben_current_buf(const struct ben_decode_ctx *ctx, size_t n);
+
+/*
+ * Increments current position by n. Used while decoding.
+ */
+void ben_skip(struct ben_decode_ctx *ctx, size_t n);
+
+/*
+ * Append one character to encoded output. The amount of bytes written to
+ * the output must be the same returned by get_size().
+ */
+int ben_put_char(struct ben_encode_ctx *ctx, char c);
+
+/*
+ * Append data to encoded output. The amount of bytes written to
+ * the output must be the same returned by get_size().
+ */
+int ben_put_buffer(struct ben_encode_ctx *ctx, const void *buf, size_t len);
 
 #endif

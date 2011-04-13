@@ -661,6 +661,91 @@ static void alloc_tests(void)
 	ben_free(dict);
 }
 
+#define SHA1_LEN		20
+
+struct ben_sha1 {
+	struct bencode_user user;
+	char sha1[SHA1_LEN];
+};
+
+static struct bencode_type sha1_type;
+
+static struct bencode *sha1_decode(struct ben_decode_ctx *ctx)
+{
+	const char *data = ben_current_buf(ctx, SHA1_LEN);
+	if (data == NULL)
+		return ben_insufficient_ptr(ctx);
+
+	struct ben_sha1 *sha1 = ben_alloc_user(&sha1_type);
+	if (sha1 == NULL)
+		return ben_oom_ptr(ctx);
+	memcpy(sha1->sha1, data, SHA1_LEN);
+
+	ben_skip(ctx, SHA1_LEN);
+
+	return (struct bencode *) sha1;
+}
+
+static int sha1_encode(struct ben_encode_ctx *ctx, const struct bencode *b)
+{
+	const struct ben_sha1 *sha1 = ben_user_type_const_cast(b, &sha1_type);
+
+	if (ben_put_char(ctx, 'r'))
+		return -1;
+
+	return ben_put_buffer(ctx, sha1->sha1, SHA1_LEN);
+}
+
+static size_t sha1_get_size(const struct bencode *b)
+{
+	(void) b;
+	return 1 + SHA1_LEN;
+}
+
+static struct bencode_type sha1_type = {
+	.size = sizeof(struct ben_sha1),
+	.decode = sha1_decode,
+	.encode = sha1_encode,
+	.get_size = sha1_get_size,
+};
+
+static void user_tests(void)
+{
+	const char dummy_sha1[] = "\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05";
+	size_t off;
+	struct bencode *b;
+	struct ben_sha1 *sha1;
+	void *data;
+	struct bencode_type *types[128] = {NULL};
+
+	types['r'] = &sha1_type;
+
+	off = 0;
+	b = ben_decode3("r\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05", 21, &off, NULL, types);
+	assert(b != NULL);
+	assert(ben_is_user_type(b, &sha1_type));
+
+	sha1 = ben_user_type_cast(b, &sha1_type);
+	assert(memcmp(sha1->sha1, dummy_sha1, SHA1_LEN) == 0);
+
+	ben_free(b);
+
+	off = 0;
+	b = ben_decode3("r\00\00\00\00", 5, &off, NULL, types);
+	assert(b == NULL);
+
+	b = ben_alloc_user(&sha1_type);
+	sha1 = ben_user_type_cast(b, &sha1_type);
+	memcpy(sha1->sha1, dummy_sha1, SHA1_LEN);
+
+	off = 0;
+	data = ben_encode(&off, b);
+	ben_free(b);
+
+	assert(memcmp(data, "r\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05", 21) == 0);
+	free(data);
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -731,6 +816,8 @@ int main(void)
 	clone_tests();
 
 	alloc_tests();
+
+	user_tests();
 
 	return 0;
 }
