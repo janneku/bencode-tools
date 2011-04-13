@@ -1545,12 +1545,11 @@ void *ben_encode(size_t *len, const struct bencode *b)
 {
 	size_t size = get_size(b);
 	void *data = malloc(size);
-	struct ben_encode_ctx ctx = {.data = data, .size = size, .pos = 0};
+	struct ben_encode_ctx ctx = {.data = data, .size = size};
 	if (data == NULL) {
 		warn("No memory to encode\n");
 		return NULL;
 	}
-	ctx.pos = 0;
 	if (serialize(&ctx, b)) {
 		free(ctx.data);
 		return NULL;
