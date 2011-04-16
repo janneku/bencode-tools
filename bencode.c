@@ -291,6 +291,26 @@ static struct bencode *clone_str(const struct bencode_str *s)
 	return ben_blob(s->s, s->len);
 }
 
+static struct bencode *share_dict(const struct bencode_dict *d)
+{
+	struct bencode *newdict = ben_dict();
+	if (newdict == NULL)
+		return NULL;
+	memcpy(newdict, d, sizeof(*d));
+	((struct bencode_dict *) newdict)->shared = 1;
+	return newdict;
+}
+
+static struct bencode *share_list(const struct bencode_list *list)
+{
+	struct bencode *newlist = ben_list();
+	if (newlist == NULL)
+		return NULL;
+	memcpy(newlist, list, sizeof(*list));
+	((struct bencode_list *) newlist)->shared = 1;
+	return newlist;
+}
+
 struct bencode *ben_clone(const struct bencode *b)
 {
 	switch (b->type) {
@@ -307,6 +327,20 @@ struct bencode *ben_clone(const struct bencode *b)
 	default:
 		die("Invalid type %c\n", b->type);
 	}	
+}
+
+struct bencode *ben_shared_clone(const struct bencode *b)
+{
+	switch (b->type) {
+	case BENCODE_DICT:
+		return share_dict(ben_dict_const_cast(b));
+		break;
+	case BENCODE_LIST:
+		return share_list(ben_list_const_cast(b));
+		break;
+	default:
+		return ben_clone(b);
+	}
 }
 
 int ben_cmp(const struct bencode *a, const struct bencode *b)
@@ -1181,6 +1215,8 @@ struct bencode *ben_decode_printed2(const void *data, size_t len, size_t *off, s
 static void free_dict(struct bencode_dict *d)
 {
 	size_t pos;
+	if (d->shared)
+		return;
 	for (pos = 0; pos < d->n; pos++) {
 		ben_free(d->nodes[pos].key);
 		ben_free(d->nodes[pos].value);
@@ -1194,6 +1230,8 @@ static void free_dict(struct bencode_dict *d)
 static void free_list(struct bencode_list *list)
 {
 	size_t pos;
+	if (list->shared)
+		return;
 	for (pos = 0; pos < list->n; pos++) {
 		ben_free(list->values[pos]);
 		list->values[pos] = NULL;

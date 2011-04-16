@@ -38,6 +38,8 @@ struct bencode_dict_node {
 
 struct bencode_dict {
 	char type;
+	char shared; /* non-zero means that the internal data is shared with
+			other instances and should not be freed */
 	size_t n;
 	size_t alloc;
 	size_t *buckets;
@@ -51,6 +53,8 @@ struct bencode_int {
 
 struct bencode_list {
 	char type;
+	char shared; /* non-zero means that the internal data is shared with
+			other instances and should not be freed */
 	size_t n;
 	size_t alloc;
 	struct bencode **values;
@@ -106,6 +110,16 @@ int ben_allocate(struct bencode *b, size_t n);
  * there is no memory to make a copy. The copy is made recursively.
  */
 struct bencode *ben_clone(const struct bencode *b);
+
+/*
+ * Returns a weak reference copy of structure b. Only a minimum amount of
+ * data is copied because the returned structure references to the same
+ * internal data as the original structure. As a result, the original
+ * structure must remain valid until the copy is destroyed.
+ *
+ * This function is used for optimization for special cases.
+ */
+struct bencode *ben_shared_clone(const struct bencode *b);
 
 /*
  * ben_cmp() is similar to strcmp(). It compares both integers and strings.

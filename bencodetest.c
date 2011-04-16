@@ -621,21 +621,36 @@ static void clone_tests(void)
 	b = ben_list();
 	ben_list_append(b, ben_int(1));
 	ben_list_append(b, ben_int(1));
+
 	c = ben_clone(b);
 	assert(ben_list_len(c) == 2);
 	ben_free(c);
+
+	c = ben_shared_clone(b);
+	assert(ben_list_len(c) == 2);
+	ben_free(c);
+
 	ben_free(b);
 
 	b = ben_dict();
 	ben_dict_set_str_by_str(b, "foo0", "a");
 	ben_dict_set_str_by_str(b, "foo1", "b");
 	ben_dict_set_str_by_str(b, "foo2", "c");
+
 	c = ben_clone(b);
 	assert(ben_dict_get_by_str(c, "foo0") != NULL);
 	assert(ben_dict_get_by_str(c, "foo1") != NULL);
 	assert(ben_dict_get_by_str(c, "foo2") != NULL);
 	assert(ben_dict_len(c) == 3);
 	ben_free(c);
+
+	c = ben_shared_clone(b);
+	assert(ben_dict_get_by_str(c, "foo0") != NULL);
+	assert(ben_dict_get_by_str(c, "foo1") != NULL);
+	assert(ben_dict_get_by_str(c, "foo2") != NULL);
+	assert(ben_dict_len(c) == 3);
+	ben_free(c);
+
 	ben_free(b);
 
 	b = ben_int(666);
