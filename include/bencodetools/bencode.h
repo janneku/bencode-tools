@@ -1,3 +1,10 @@
+/*
+ * libbencodetools
+ *
+ * Written by Heikki Orsila <heikki.orsila@iki.fi> and
+ * Janne Kulmala <janne.t.kulmala@tut.fi> in 2011.
+ */
+
 #ifndef TYPEVALIDATOR_BENCODE_H
 #define TYPEVALIDATOR_BENCODE_H
 
