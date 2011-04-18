@@ -82,6 +82,7 @@ struct bencode_type {
 	int (*encode) (struct ben_encode_ctx *ctx, const struct bencode *b);
 	size_t (*get_size) (const struct bencode *b);
 	void (*free) (struct bencode *b);
+	int (*cmp) (const struct bencode *a, const struct bencode *b);
 };
 
 struct bencode_user {

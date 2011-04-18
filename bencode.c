@@ -405,6 +405,8 @@ int ben_cmp(const struct bencode *a, const struct bencode *b)
 	const struct bencode_int *ib;
 	const struct bencode_str *sa;
 	const struct bencode_str *sb;
+	const struct bencode_user *ua;
+	const struct bencode_user *ub;
 
 	if (a->type != b->type)
 		return (a->type == BENCODE_INT) ? -1 : 1;
@@ -432,6 +434,12 @@ int ben_cmp(const struct bencode *a, const struct bencode *b)
 		return cmp_dict(a, b);
 	case BENCODE_LIST:
 		return cmp_list(a, b);
+	case BENCODE_USER:
+		ua = ben_user_const_cast(a);
+		ub = ben_user_const_cast(b);
+		if (ua->info != ub->info)
+			return (a < b) ? -1 : 1;
+		return ua->info->cmp(a, b);
 	default:
 		die("Invalid type %c\n", b->type);
 	}
