@@ -280,27 +280,27 @@ struct bencode *ben_str(const char *s);
 const char *ben_strerror(int error);
 
 /* ben_is_bool() returns 1 iff b is a boolean, 0 otherwise */
-static inline int ben_is_bool(struct bencode *b)
+static inline int ben_is_bool(const struct bencode *b)
 {
 	return b->type == BENCODE_BOOL;
 }
-static inline int ben_is_dict(struct bencode *b)
+static inline int ben_is_dict(const struct bencode *b)
 {
 	return b->type == BENCODE_DICT;
 }
-static inline int ben_is_int(struct bencode *b)
+static inline int ben_is_int(const struct bencode *b)
 {
 	return b->type == BENCODE_INT;
 }
-static inline int ben_is_list(struct bencode *b)
+static inline int ben_is_list(const struct bencode *b)
 {
 	return b->type == BENCODE_LIST;
 }
-static inline int ben_is_str(struct bencode *b)
+static inline int ben_is_str(const struct bencode *b)
 {
 	return b->type == BENCODE_STR;
 }
-static inline int ben_is_user(struct bencode *b)
+static inline int ben_is_user(const struct bencode *b)
 {
 	return b->type == BENCODE_USER;
 }
