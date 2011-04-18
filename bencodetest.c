@@ -710,11 +710,12 @@ static struct bencode_type sha1_type;
 
 static struct bencode *sha1_decode(struct ben_decode_ctx *ctx)
 {
+	struct ben_sha1 *sha1;
 	const char *data = ben_current_buf(ctx, SHA1_LEN);
 	if (data == NULL)
 		return ben_insufficient_ptr(ctx);
 
-	struct ben_sha1 *sha1 = ben_alloc_user(&sha1_type);
+	sha1 = ben_alloc_user(&sha1_type);
 	if (sha1 == NULL)
 		return ben_oom_ptr(ctx);
 	memcpy(sha1->sha1, data, SHA1_LEN);
@@ -782,6 +783,91 @@ static void user_tests(void)
 
 	assert(memcmp(data, "r\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05", 21) == 0);
 	free(data);
+}
+
+static void cmptest(const struct bencode *a, struct bencode *b, int expect)
+{
+	int ret = ben_cmp(a, b);
+	if (ret != expect) {
+		fprintf(stderr, "cmp returned %d, should have returned %d\n",
+			ret, expect);
+		abort();
+	}
+	ben_free(b);
+}
+
+static void cmp_tests(void)
+{
+	struct bencode *b;
+	struct bencode *c;
+
+	b = ben_str("foo");
+	cmptest(b, ben_str("foo"), 0);
+	cmptest(b, ben_str("fooa"), -1);
+	cmptest(b, ben_str("faa"), 1);
+	ben_free(b);
+
+	b = ben_list();
+	ben_list_append(b, ben_str("a"));
+	ben_list_append(b, ben_str("b"));
+
+	c = ben_list();
+	ben_list_append(c, ben_str("a"));
+	ben_list_append(c, ben_str("b"));
+	cmptest(b, c, 0);
+
+	c = ben_list();
+	ben_list_append(c, ben_str("a"));
+	ben_list_append(c, ben_str("c"));
+	cmptest(b, c, -1);
+
+	c = ben_list();
+	ben_list_append(c, ben_str("a"));
+	ben_list_append(c, ben_str("b"));
+	ben_list_append(c, ben_str("c"));
+	cmptest(b, c, -1);
+
+	c = ben_list();
+	ben_list_append(c, ben_str("a"));
+	ben_list_append(c, ben_str("a"));
+	cmptest(b, c, 1);
+
+	c = ben_list();
+	ben_list_append(c, ben_str("a"));
+	cmptest(b, c, 1);
+
+	ben_free(b);
+
+	b = ben_dict();
+	ben_dict_set_str_by_str(b, "foo0", "a");
+	ben_dict_set_str_by_str(b, "foo1", "b");
+
+	c = ben_dict();
+	ben_dict_set_str_by_str(c, "foo0", "a");
+	ben_dict_set_str_by_str(c, "foo1", "b");
+	cmptest(b, c, 0);
+
+	c = ben_dict();
+	ben_dict_set_str_by_str(c, "foo1", "c");
+	ben_dict_set_str_by_str(c, "foo0", "a");
+	cmptest(b, c, -1);
+
+	c = ben_dict();
+	ben_dict_set_str_by_str(c, "foo0", "a");
+	ben_dict_set_str_by_str(c, "foo1", "b");
+	ben_dict_set_str_by_str(c, "foo1", "c");
+	cmptest(b, c, -1);
+
+	c = ben_dict();
+	ben_dict_set_str_by_str(c, "foo0", "a");
+	ben_dict_set_str_by_str(c, "foo1", "a");
+	cmptest(b, c, 1);
+
+	c = ben_dict();
+	ben_dict_set_str_by_str(c, "foo0", "a");
+	cmptest(b, c, 1);
+
+	ben_free(b);
 }
 
 int main(void)
@@ -856,6 +942,8 @@ int main(void)
 	alloc_tests();
 
 	user_tests();
+
+	cmp_tests();
 
 	return 0;
 }

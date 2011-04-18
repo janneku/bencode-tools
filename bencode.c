@@ -49,7 +49,6 @@ struct bencode_keyvalue {
 	struct bencode *value;
 };
 
-static struct bencode *decode(struct ben_decode_ctx *ctx);
 static struct bencode *decode_printed(struct ben_decode_ctx *ctx);
 static int resize_dict(struct bencode_dict *d, size_t newalloc);
 static int resize_list(struct bencode_list *list, size_t newalloc);
@@ -350,35 +349,97 @@ struct bencode *ben_shared_clone(const struct bencode *b)
 	}
 }
 
+static int cmp_dict(const struct bencode *a, const struct bencode *b)
+{
+	size_t pos;
+	struct bencode *key;
+	struct bencode *va;
+	struct bencode *vb;
+	int ret;
+
+	if (ben_dict_len(a) != ben_dict_len(b))
+		return (ben_dict_len(a) < ben_dict_len(b)) ? -1 : 1;
+
+	ben_dict_for_each(key, va, pos, a) {
+		vb = ben_dict_get(b, key);
+		if (vb == NULL) {
+			/*
+			 * Comparing dictionaries that have different keys
+			 * is not yet supported.
+			 */
+			die("bencode: Trying to compare dictionaries that have different keys\n");
+		}
+		ret = ben_cmp(va, vb);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
+static int cmp_list(const struct bencode *a, const struct bencode *b)
+{
+	const struct bencode_list *la;
+	const struct bencode_list *lb;
+	struct bencode *va;
+	struct bencode *vb;
+	size_t cmplen;
+	size_t i;
+	int ret;
+
+	la = ben_list_const_cast(a);
+	lb = ben_list_const_cast(b);
+	cmplen = (la->n <= lb->n) ? la->n : lb->n;
+
+	for (i = 0; i < cmplen; ++i) {
+		va = ben_list_get(a, i);
+		vb = ben_list_get(b, i);
+		ret = ben_cmp(va, vb);
+		if (ret)
+			return ret;
+	}
+	if (la->n != lb->n)
+		return (la->n < lb->n) ? -1 : 1;
+	return 0;
+}
+
 int ben_cmp(const struct bencode *a, const struct bencode *b)
 {
 	size_t cmplen;
 	int ret;
+	const struct bencode_int *ia;
+	const struct bencode_int *ib;
 	const struct bencode_str *sa;
 	const struct bencode_str *sb;
 
 	if (a->type != b->type)
 		return (a->type == BENCODE_INT) ? -1 : 1;
 
-	if (a->type == BENCODE_INT) {
-		const struct bencode_int *ia = ben_int_const_cast(a);
-		const struct bencode_int *ib = ben_int_const_cast(b);
+	switch (a->type) {
+	case BENCODE_INT:
+		ia = ben_int_const_cast(a);
+		ib = ben_int_const_cast(b);
 		if (ia->ll < ib->ll)
 			return -1;
 		if (ib->ll < ia->ll)
 			return 1;
 		return 0;
+	case BENCODE_STR:
+		sa = ben_str_const_cast(a);
+		sb = ben_str_const_cast(b);
+		cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
+		ret = memcmp(sa->s, sb->s, cmplen);
+		if (ret)
+			return ret;
+		if (sa->len != sb->len)
+			return (sa->len < sb->len) ? -1 : 1;
+		return 0;
+	case BENCODE_DICT:
+		return cmp_dict(a, b);
+	case BENCODE_LIST:
+		return cmp_list(a, b);
+	default:
+		die("Invalid type %c\n", b->type);
 	}
-
-	sa = ben_str_const_cast(a);
-	sb = ben_str_const_cast(b);
-	cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
-	ret = memcmp(sa->s, sb->s, cmplen);
-	if (sa->len == sb->len)
-		return ret;
-	if (ret)
-		return ret;
-	return (sa->len < sb->len) ? -1 : 1;
 }
 
 int ben_cmp_qsort(const void *a, const void *b)
@@ -542,7 +603,7 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 			ctx->error = BEN_NO_MEMORY;
 			goto error;
 		}
-		key = decode(ctx);
+		key = ben_decode_one(ctx);
 		if (key == NULL)
 			goto error;
 		if (key->type != BENCODE_INT && key->type != BENCODE_STR) {
@@ -560,7 +621,7 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 			goto error;
 		}
 
-		value = decode(ctx);
+		value = ben_decode_one(ctx);
 		if (value == NULL) {
 			ben_free(key);
 			key = NULL;
@@ -682,7 +743,7 @@ static struct bencode *decode_list(struct ben_decode_ctx *ctx)
 	ctx->off += 1;
 
 	while (ctx->off < ctx->len && ben_current_char(ctx) != 'e') {
-		struct bencode *b = decode(ctx);
+		struct bencode *b = ben_decode_one(ctx);
 		if (b == NULL)
 			goto error;
 		if (ben_list_append((struct bencode *) l, b)) {
@@ -739,7 +800,7 @@ static struct bencode *decode_str(struct ben_decode_ctx *ctx)
 	return b;
 }
 
-static struct bencode *decode(struct ben_decode_ctx *ctx)
+struct bencode *ben_decode_one(struct ben_decode_ctx *ctx)
 {
 	char c;
 	struct bencode_type *type;
@@ -796,7 +857,7 @@ static struct bencode *decode(struct ben_decode_ctx *ctx)
 struct bencode *ben_decode(const void *data, size_t len)
 {
 	struct ben_decode_ctx ctx = {.data = data, .len = len};
-	struct bencode *b = decode(&ctx);
+	struct bencode *b = ben_decode_one(&ctx);
 	if (b != NULL && ctx.off != len) {
 		ben_free(b);
 		return NULL;
@@ -807,7 +868,7 @@ struct bencode *ben_decode(const void *data, size_t len)
 struct bencode *ben_decode2(const void *data, size_t len, size_t *off, int *error)
 {
 	struct ben_decode_ctx ctx = {.data = data, .len = len, .off = *off};
-	struct bencode *b = decode(&ctx);
+	struct bencode *b = ben_decode_one(&ctx);
 	*off = ctx.off;
 	if (error != NULL) {
 		assert((b != NULL) ^ (ctx.error != 0));
@@ -820,7 +881,7 @@ struct bencode *ben_decode3(const void *data, size_t len, size_t *off, int *erro
 {
 	struct ben_decode_ctx ctx = {.data = data, .len = len, .off = *off,
 				     .types = types};
-	struct bencode *b = decode(&ctx);
+	struct bencode *b = ben_decode_one(&ctx);
 	*off = ctx.off;
 	if (error != NULL) {
 		assert((b != NULL) ^ (ctx.error != 0));
@@ -1458,7 +1519,7 @@ static size_t get_printed_size(const struct bencode *b)
 	}
 }
 
-static int serialize(struct ben_encode_ctx *ctx, const struct bencode *b)
+int ben_encode_one(struct ben_encode_ctx *ctx, const struct bencode *b)
 {
 	const struct bencode_bool *boolean;
 	const struct bencode_dict *dict;
@@ -1492,9 +1553,9 @@ static int serialize(struct ben_encode_ctx *ctx, const struct bencode *b)
 		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
 		for (i = 0; i < dict->n; i++) {
-			if (serialize(ctx, pairs[i].key))
+			if (ben_encode_one(ctx, pairs[i].key))
 				break;
-			if (serialize(ctx, pairs[i].value))
+			if (ben_encode_one(ctx, pairs[i].value))
 				break;
 		}
 		free(pairs);
@@ -1518,7 +1579,7 @@ static int serialize(struct ben_encode_ctx *ctx, const struct bencode *b)
 
 		list = ben_list_const_cast(b);
 		for (i = 0; i < list->n; i++) {
-			if (serialize(ctx, list->values[i]))
+			if (ben_encode_one(ctx, list->values[i]))
 				return -1;
 		}
 
@@ -1595,7 +1656,7 @@ void *ben_encode(size_t *len, const struct bencode *b)
 		warn("No memory to encode\n");
 		return NULL;
 	}
-	if (serialize(&ctx, b)) {
+	if (ben_encode_one(&ctx, b)) {
 		free(ctx.data);
 		return NULL;
 	}
@@ -1607,7 +1668,7 @@ void *ben_encode(size_t *len, const struct bencode *b)
 size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b)
 {
 	struct ben_encode_ctx ctx = {.data = data, .size = maxlen, .pos = 0};
-	if (serialize(&ctx, b))
+	if (ben_encode_one(&ctx, b))
 		return -1;
 	return ctx.pos;
 }
