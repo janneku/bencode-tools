@@ -519,34 +519,63 @@ void *ben_invalid_ptr(struct ben_decode_ctx *ctx);
 void *ben_oom_ptr(struct ben_decode_ctx *ctx);
 
 /*
- * Test whether the input has at least n bytes left while decoding.
+ * Decode from the current position of 'ctx'.
+ *
+ * This function is used to implement decoders for user-defined types.
+ */
+struct bencode *ben_decode_one(struct ben_decode_ctx *ctx);
+
+/*
+ * Test whether the input of 'ctx' has at least n bytes left.
  * Returns 0 when there is enough bytes left and -1 when there isn't.
+ *
+ * This function is used to implement decoders for user-defined types.
  */
 int ben_need_bytes(const struct ben_decode_ctx *ctx, size_t n);
 
-/* Returns the character in current position while decoding */
+/*
+ * Returns the character in current position of 'ctx'.
+ *
+ * This function is used to implement decoders for user-defined types.
+ */
 char ben_current_char(const struct ben_decode_ctx *ctx);
 
 /*
  * Get the next n bytes from input.
  * Returns pointer to the data or NULL when there aren't enough bytes left.
+ *
+ * This function is used to implement decoders for user-defined types.
  */
 const char *ben_current_buf(const struct ben_decode_ctx *ctx, size_t n);
 
 /*
- * Increments current position by n. Used while decoding.
+ * Increments current position by n.
+ *
+ * This function is used to implement decoders for user-defined types.
  */
 void ben_skip(struct ben_decode_ctx *ctx, size_t n);
 
 /*
- * Append one character to encoded output. The amount of bytes written to
- * the output must be the same as returned by get_size().
+ * Encode to the output of 'ctx'. The size of the encoded data can be obtained
+ * with ben_encoded_size().
+ *
+ * This function is used to implement encoders for user-defined types.
+ */
+int ben_encode_one(struct ben_encode_ctx *ctx, const struct bencode *b);
+
+/*
+ * Append one character to output of 'ctx'. The amount of bytes written to the
+ * output must be the same as returned by get_size().
+ *
+ * This function is used to implement encoders for user-defined types.
  */
 int ben_put_char(struct ben_encode_ctx *ctx, char c);
 
 /*
- * Append data to encoded output. The amount of bytes written to
- * the output must be the same as returned by get_size().
+ * Append data to output of 'ctx'. The amount of bytes written to the output
+ * must be the same as returned by get_size().
+ *
+ * This function is used to implement encoders for user-defined types.
  */
 int ben_put_buffer(struct ben_encode_ctx *ctx, const void *buf, size_t len);
 
