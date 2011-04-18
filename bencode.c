@@ -342,35 +342,97 @@ struct bencode *ben_shared_clone(const struct bencode *b)
 	}
 }
 
+static int cmp_dict(const struct bencode *a, const struct bencode *b)
+{
+	size_t pos;
+	struct bencode *key;
+	struct bencode *va;
+	struct bencode *vb;
+	int ret;
+
+	if (ben_dict_len(a) != ben_dict_len(b))
+		return (ben_dict_len(a) < ben_dict_len(b)) ? -1 : 1;
+
+	ben_dict_for_each(key, va, pos, a) {
+		vb = ben_dict_get(b, key);
+		if (vb == NULL) {
+			/*
+			 * Comparing dictionaries that have different keys
+			 * is not yet supported.
+			 */
+			die("bencode: Trying to compare dictionaries that have different keys\n");
+		}
+		ret = ben_cmp(va, vb);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
+static int cmp_list(const struct bencode *a, const struct bencode *b)
+{
+	const struct bencode_list *la;
+	const struct bencode_list *lb;
+	struct bencode *va;
+	struct bencode *vb;
+	size_t cmplen;
+	size_t i;
+	int ret;
+
+	la = ben_list_const_cast(a);
+	lb = ben_list_const_cast(b);
+	cmplen = (la->n <= lb->n) ? la->n : lb->n;
+
+	for (i = 0; i < cmplen; ++i) {
+		va = ben_list_get(a, i);
+		vb = ben_list_get(b, i);
+		ret = ben_cmp(va, vb);
+		if (ret)
+			return ret;
+	}
+	if (la->n != lb->n)
+		return (la->n < lb->n) ? -1 : 1;
+	return 0;
+}
+
 int ben_cmp(const struct bencode *a, const struct bencode *b)
 {
 	size_t cmplen;
 	int ret;
+	const struct bencode_int *ia;
+	const struct bencode_int *ib;
 	const struct bencode_str *sa;
 	const struct bencode_str *sb;
 
 	if (a->type != b->type)
 		return (a->type == BENCODE_INT) ? -1 : 1;
 
-	if (a->type == BENCODE_INT) {
-		const struct bencode_int *ia = ben_int_const_cast(a);
-		const struct bencode_int *ib = ben_int_const_cast(b);
+	switch (a->type) {
+	case BENCODE_INT:
+		ia = ben_int_const_cast(a);
+		ib = ben_int_const_cast(b);
 		if (ia->ll < ib->ll)
 			return -1;
 		if (ib->ll < ia->ll)
 			return 1;
 		return 0;
+	case BENCODE_STR:
+		sa = ben_str_const_cast(a);
+		sb = ben_str_const_cast(b);
+		cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
+		ret = memcmp(sa->s, sb->s, cmplen);
+		if (ret)
+			return ret;
+		if (sa->len != sb->len)
+			return (sa->len < sb->len) ? -1 : 1;
+		return 0;
+	case BENCODE_DICT:
+		return cmp_dict(a, b);
+	case BENCODE_LIST:
+		return cmp_list(a, b);
+	default:
+		die("Invalid type %c\n", b->type);
 	}
-
-	sa = ben_str_const_cast(a);
-	sb = ben_str_const_cast(b);
-	cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
-	ret = memcmp(sa->s, sb->s, cmplen);
-	if (sa->len == sb->len)
-		return ret;
-	if (ret)
-		return ret;
-	return (sa->len < sb->len) ? -1 : 1;
 }
 
 int ben_cmp_qsort(const void *a, const void *b)
