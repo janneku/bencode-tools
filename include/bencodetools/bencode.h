@@ -530,7 +530,7 @@ void *ben_oom_ptr(struct ben_decode_ctx *ctx);
  *
  * This function is used to implement decoders for user-defined types.
  */
-struct bencode *ben_decode_one(struct ben_decode_ctx *ctx);
+struct bencode *ben_ctx_decode(struct ben_decode_ctx *ctx);
 
 /*
  * Test whether the input of 'ctx' has at least n bytes left.
@@ -568,7 +568,7 @@ void ben_skip(struct ben_decode_ctx *ctx, size_t n);
  *
  * This function is used to implement encoders for user-defined types.
  */
-int ben_encode_one(struct ben_encode_ctx *ctx, const struct bencode *b);
+int ben_ctx_encode(struct ben_encode_ctx *ctx, const struct bencode *b);
 
 /*
  * Append one character to output of 'ctx'. The amount of bytes written to the
