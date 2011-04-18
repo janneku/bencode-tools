@@ -362,13 +362,8 @@ static int cmp_dict(const struct bencode *a, const struct bencode *b)
 
 	ben_dict_for_each(key, va, pos, a) {
 		vb = ben_dict_get(b, key);
-		if (vb == NULL) {
-			/*
-			 * Comparing dictionaries that have different keys
-			 * is not yet supported.
-			 */
-			die("bencode: Trying to compare dictionaries that have different keys\n");
-		}
+		if (vb == NULL)
+			return (a < b) ? -1 : 1;
 		ret = ben_cmp(va, vb);
 		if (ret)
 			return ret;

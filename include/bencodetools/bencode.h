@@ -129,10 +129,19 @@ struct bencode *ben_clone(const struct bencode *b);
 struct bencode *ben_shared_clone(const struct bencode *b);
 
 /*
- * ben_cmp() is similar to strcmp(). It compares both integers and strings.
- * An integer is always less than a string.
+ * ben_cmp() is similar to strcmp(). It compares integers, strings and
+ * lists similar to Python. Note: an integer is always less than a string.
  *
  * ben_cmp(a, b) returns -1 if a < b, 0 if a == b, and 1 if a > b.
+ *
+ * It can also compare dictionaries. The comparison result can be used for
+ * ordering iff the dictionaries have exactly the same keys.
+ * If dictionaries are identical, 0 is returned.
+ * If the dictionaries have different number of keys, -1 is returned
+ * if 'a' is shorter than 'b', and 1 is returned otherwise.
+ * If the dictionaries have same number but different keys, either -1 or 1
+ * is returned (a comparison to be defined properly for futher implementation).
+ * Note recursive dictionaries in depth have the same issues also.
  */
 int ben_cmp(const struct bencode *a, const struct bencode *b);
 
