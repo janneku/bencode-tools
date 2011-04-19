@@ -706,23 +706,37 @@ struct ben_sha1 {
 	char sha1[SHA1_LEN];
 };
 
+struct ben_pair {
+	struct bencode_user user;
+	struct bencode *first;
+	struct bencode *second;
+};
+
 static struct bencode_type sha1_type;
+static struct bencode_type pair_type;
+
+static struct bencode *alloc_sha1(const char *data)
+{
+	struct ben_sha1 *sha1 = ben_alloc_user(&sha1_type);
+	if (sha1 == NULL)
+		return NULL;
+	memcpy(sha1->sha1, data, SHA1_LEN);
+	return (struct bencode *) sha1;
+}
 
 static struct bencode *sha1_decode(struct ben_decode_ctx *ctx)
 {
-	struct ben_sha1 *sha1;
+	struct bencode *sha1;
 	const char *data = ben_current_buf(ctx, SHA1_LEN);
 	if (data == NULL)
 		return ben_insufficient_ptr(ctx);
 
-	sha1 = ben_alloc_user(&sha1_type);
+	sha1 = alloc_sha1(data);
 	if (sha1 == NULL)
 		return ben_oom_ptr(ctx);
-	memcpy(sha1->sha1, data, SHA1_LEN);
 
 	ben_skip(ctx, SHA1_LEN);
-
-	return (struct bencode *) sha1;
+	return sha1;
 }
 
 static int sha1_encode(struct ben_encode_ctx *ctx, const struct bencode *b)
@@ -741,6 +755,68 @@ static size_t sha1_get_size(const struct bencode *b)
 	return 1 + SHA1_LEN;
 }
 
+static struct bencode *alloc_pair(struct bencode *first, struct bencode *second)
+{
+	struct ben_pair *pair = ben_alloc_user(&pair_type);
+	if (pair == NULL)
+		return NULL;
+	pair->first = first;
+	pair->second = second;
+	return (struct bencode *) pair;
+}
+
+static struct bencode *pair_decode(struct ben_decode_ctx *ctx)
+{
+	struct bencode *pair;
+	struct bencode *second;
+	struct bencode *first = ben_ctx_decode(ctx);
+	if (first == NULL)
+		return NULL;
+
+	second = ben_ctx_decode(ctx);
+	if (second == NULL) {
+		ben_free(first);
+		return NULL;
+	}
+
+	pair = alloc_pair(first, second);
+	if (pair == NULL) {
+		ben_free(first);
+		ben_free(second);
+		return ben_oom_ptr(ctx);
+	}
+	return (struct bencode *) pair;
+}
+
+static int pair_encode(struct ben_encode_ctx *ctx, const struct bencode *b)
+{
+	const struct ben_pair *pair = ben_user_type_const_cast(b, &pair_type);
+
+	if (ben_put_char(ctx, 'p'))
+		return -1;
+	if (ben_ctx_encode(ctx, pair->first))
+		return -1;
+	if (ben_ctx_encode(ctx, pair->second))
+		return -1;
+	return 0;
+}
+
+static size_t pair_get_size(const struct bencode *b)
+{
+	const struct ben_pair *pair = ben_user_type_const_cast(b, &pair_type);
+
+	return 1 + ben_encoded_size(pair->first) +
+	       ben_encoded_size(pair->second);
+}
+
+static void pair_free(struct bencode *b)
+{
+	struct ben_pair *pair = ben_user_type_cast(b, &pair_type);
+
+	ben_free(pair->first);
+	ben_free(pair->second);
+}
+
 static struct bencode_type sha1_type = {
 	.size = sizeof(struct ben_sha1),
 	.decode = sha1_decode,
@@ -748,41 +824,73 @@ static struct bencode_type sha1_type = {
 	.get_size = sha1_get_size,
 };
 
+static struct bencode_type pair_type = {
+	.size = sizeof(struct ben_pair),
+	.decode = pair_decode,
+	.encode = pair_encode,
+	.get_size = pair_get_size,
+	.free = pair_free,
+};
+
 static void user_tests(void)
 {
-	const char dummy_sha1[] = "\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05";
-	size_t off;
+	const char dummy_sha1[] = {
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+		0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13};
+	size_t off = 0;
+	size_t len = 0;
 	struct bencode *b;
+	struct bencode *c;
+	struct bencode *d;
 	struct ben_sha1 *sha1;
+	struct ben_pair *pair;
 	void *data;
 	struct bencode_type *types[128] = {NULL};
 
-	types['r'] = &sha1_type;
+	assert(sizeof dummy_sha1 == SHA1_LEN);
 
-	off = 0;
-	b = ben_decode3("r\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05", 21, &off, NULL, types);
-	assert(b != NULL);
+	types['r'] = &sha1_type;
+	types['p'] = &pair_type;
+
+	b = alloc_sha1(dummy_sha1);
+	data = ben_encode(&len, b);
+	ben_free(b);
+
+	b = ben_decode3(data, len, &off, NULL, types);
 	assert(ben_is_user_type(b, &sha1_type));
 
 	sha1 = ben_user_type_cast(b, &sha1_type);
 	assert(memcmp(sha1->sha1, dummy_sha1, SHA1_LEN) == 0);
 
 	ben_free(b);
+	free(data);
 
 	off = 0;
 	b = ben_decode3("r\00\00\00\00", 5, &off, NULL, types);
 	assert(b == NULL);
 
-	b = ben_alloc_user(&sha1_type);
-	sha1 = ben_user_type_cast(b, &sha1_type);
-	memcpy(sha1->sha1, dummy_sha1, SHA1_LEN);
-
-	off = 0;
-	data = ben_encode(&off, b);
+	c = ben_str("foo");
+	d = ben_int(1234);
+	b = alloc_pair(c, d);
+	data = ben_encode(&len, b);
 	ben_free(b);
 
-	assert(memcmp(data, "r\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\02\03\04\05", 21) == 0);
+	assert(len == 12 && memcmp(data, "p3:fooi1234e", 12) == 0);
+
+	off = 0;
+	b = ben_decode3(data, len, &off, NULL, types);
+	assert(ben_is_user_type(b, &pair_type));
+
+	pair = ben_user_type_cast(b, &pair_type);
+	assert(strcmp(ben_str_val(pair->first), "foo") == 0 &&
+	       ben_int_val(pair->second) == 1234);
+
+	ben_free(b);
 	free(data);
+
+	off = 0;
+	b = ben_decode3("p3:foo", 6, &off, NULL, types);
+	assert(b == NULL);
 }
 
 static void cmptest(const struct bencode *a, struct bencode *b, int expect)
