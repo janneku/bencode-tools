@@ -1,2 +1,3 @@
-Type validator code is in public domain. However, read LICENSE.bencode
-for bencode.py licensing information.
+bencode-tools code is in public domain with the exception that
+bencode.py is licensed differently.
+Read LICENSE.bencode for bencode.py licensing information.
