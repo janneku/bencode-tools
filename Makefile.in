@@ -7,6 +7,8 @@ LIBPATH = {LIBPATH}
 LIBNAME = {LIBNAME}
 SHAREDNAMEFLAG = {SHAREDNAMEFLAG}
 
+PYTHON_INSTALL_OPTION = {PYTHON_INSTALL_OPTION}
+
 LIBMODULES = bencode.o
 
 all:	$(LIBNAME) bencodetest bencat
@@ -24,14 +26,21 @@ bencat:	bencat.c $(LIBNAME)
 
 check:	bencodetest
 	./bencodetest
+	python bencode.py
+	python typevalidator.py
 	@echo
 	@echo "All tests successful" #
 
 install:	
+	@echo "Installing C library"
+	@echo
 	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/bencodetools" "$(PREFIX)/bin"
 	install -m 644 include/bencodetools/*.h "$(PREFIX)/include/bencodetools/"
 	install -m 644 $(LIBNAME) "$(LIBPATH)"
 	install bencat "$(PREFIX)/bin/"
+	@echo
+	@echo "Installing Python packages"
+	python setup.py install "$(PYTHON_INSTALL_OPTION)"
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $<

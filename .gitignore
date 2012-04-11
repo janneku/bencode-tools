@@ -5,3 +5,4 @@ Makefile
 *.o
 bencat
 bencodetest
+build

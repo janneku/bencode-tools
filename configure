@@ -2,6 +2,7 @@
 
 prefix=/usr/local
 libpath=""
+python_install_option=""
 
 for opt in "$@" ; do
 	case $opt in
@@ -17,6 +18,7 @@ for opt in "$@" ; do
 	--home)
 		prefix="$HOME"
 		LDFLAGS="-L$HOME/lib -Wl,-rpath,$HOME/lib"
+		python_install_option="--user"
 		;;
 	--help)
 		echo ""
@@ -72,6 +74,7 @@ sed -e "s|{PREFIX}|$prefix|g" \
     -e "s|{SHAREDFLAG}|$SHAREDFLAG|g" \
     -e "s|{SHAREDNAMEFLAG}|$SHAREDNAMEFLAG|g" \
     -e "s|{LIBNAME}|$LIBNAME|g" \
+    -e "s|{PYTHON_INSTALL_OPTION}|$python_install_option|g" \
     < Makefile.in > Makefile
 
 echo
