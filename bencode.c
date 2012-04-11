@@ -426,7 +426,7 @@ int ben_cmp(const struct bencode *a, const struct bencode *b)
 		cmplen = (sa->len <= sb->len) ? sa->len : sb->len;
 		ret = memcmp(sa->s, sb->s, cmplen);
 		if (ret)
-			return ret;
+			return ret < 0 ? -1 : 1;
 		if (sa->len != sb->len)
 			return (sa->len < sb->len) ? -1 : 1;
 		return 0;
