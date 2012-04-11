@@ -601,11 +601,6 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 	ctx->off += 1;
 
 	while (ctx->off < ctx->len && ben_current_char(ctx) != 'e') {
-		if (d->n == d->alloc && resize_dict(d, -1)) {
-			warn("Can not resize dict\n");
-			ctx->error = BEN_NO_MEMORY;
-			goto error;
-		}
 		key = ben_ctx_decode(ctx);
 		if (key == NULL)
 			goto error;
@@ -631,7 +626,15 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 			goto error;
 		}
 
-		ben_dict_set((struct bencode *) d, key, value);
+		if (ben_dict_set((struct bencode *) d, key, value)) {
+			ben_free(key);
+			ben_free(value);
+			key = NULL;
+			value = NULL;
+			ctx->error = BEN_NO_MEMORY;
+			goto error;
+		}
+
 		lastkey = key;
 	}
 	if (ctx->off >= ctx->len) {
