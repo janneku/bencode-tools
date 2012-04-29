@@ -975,6 +975,7 @@ static void cmp_tests(void)
 {
 	struct bencode *b;
 	struct bencode *c;
+	struct bencode *d;
 
 	b = ben_str("foo");
 	cmptest(b, ben_str("foo"), 0);
@@ -1041,6 +1042,14 @@ static void cmp_tests(void)
 	c = ben_dict();
 	ben_dict_set_str_by_str(c, "foo0", "a");
 	cmptest(b, c, 1);
+
+	c = ben_dict();
+	ben_dict_set_str_by_str(c, "1", "c");
+	ben_dict_set_str_by_str(c, "0", "b");
+	d = ben_dict();
+	ben_dict_set_str_by_str(d, "0", "a");
+	ben_dict_set_str_by_str(d, "1", "d");
+	cmptest(c, d, 1);
 
 	ben_free(b);
 }
