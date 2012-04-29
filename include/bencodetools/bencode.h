@@ -134,19 +134,17 @@ struct bencode *ben_shared_clone(const struct bencode *b);
  * similar to Python. User-defined types can be also compared.
  * Note: an integer is always less than a string.
  *
- * ben_cmp(a, b) returns -1 if a < b, 0 if a == b, and 1 if a > b.
+ * ben_cmp(a, b) returns a negative value if "a < b", 0 if "a == b",
+ * or a positive value if "a > b".
  *
- * It can also compare dictionaries. The comparison result can be used for
- * ordering iff the dictionaries have exactly the same keys.
- * If dictionaries are identical, 0 is returned.
- * If the dictionaries have different number of keys, -1 is returned
- * if 'a' is shorter than 'b', and 1 is returned otherwise.
- * If the dictionaries have same number but different keys, either -1 or 1
- * is returned (a comparison to be defined properly for futher implementation).
- * Note recursive dictionaries in depth have the same issues also.
+ * Algorithm for comparing dictionaries is:
+ * If 'a' and 'b' have different number of keys or keys have different values,
+ * a non-zero value is returned. Otherwise, they have the exact same keys
+ * and comparison is done in ben_cmp() order of keys. The value for each key
+ * is compared, and the first inequal value (ben_cmp() != 0) defines the
+ * return value of the comparison.
  *
- * When comparing different user-defined types, either -1 or 1 is returned
- * (it is guaranteed that the order of any two structures is always the same).
+ * Note: recursive dictionaries in depth have the same issues.
  */
 int ben_cmp(const struct bencode *a, const struct bencode *b);
 
@@ -239,6 +237,24 @@ struct bencode *ben_dict_get(const struct bencode *d, const struct bencode *key)
 
 struct bencode *ben_dict_get_by_str(const struct bencode *d, const char *key);
 struct bencode *ben_dict_get_by_int(const struct bencode *d, long long key);
+
+struct bencode_keyvalue {
+	struct bencode *key;
+	struct bencode *value;
+};
+
+/*
+ * Returns an array of key-value pairs in key order as defined by ben_cmp().
+ * Array elements are struct bencode_keyvalue members. Returns NULL if
+ * the array can not be allocated or the bencode object is not a dictionary.
+ * The returned array must be freed by using free(). The length of the
+ * array can be determined with ben_dict_len(d).
+ *
+ * Warning: key and value pointers in the array are pointers to exact same
+ * objects in the dictionary. Therefore, the dictionary and its key-values
+ * must exist while the same keys and values are accessed from the array.
+ */
+struct bencode_keyvalue *ben_dict_ordered_items(const struct bencode *d);
 
 /*
  * Try to locate 'key' in dictionary. Returns the associated value, if found.

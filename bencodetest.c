@@ -361,6 +361,73 @@ static void misc_tests(void)
 	testvectors(invalidvectors, 0);
 }
 
+static void ben_dict_ordered_items_tests(void)
+{
+	struct bencode *d;
+	struct bencode *key;
+	struct bencode *value;
+	struct bencode_keyvalue *pairs;
+	const char *keyvalues[] = {
+		"ka", "va", NULL,
+		"ka", "va", NULL,
+		"ka", "va", "kb", "vb", NULL,
+		"ka", "va", "kb", "vb", NULL,
+		"kb", "vb", "ka", "va", NULL,
+		"ka", "va", "kb", "vb", NULL,
+		"ka", "va", "kb", "vb", "kc", "vc", NULL,
+		"ka", "va", "kb", "vb", "kc", "vc", NULL,
+		"kb", "vb", "kc", "vc", "ka", "va", NULL,
+		"ka", "va", "kb", "vb", "kc", "vc", NULL,
+		NULL};
+	const size_t n = sizeof(keyvalues) / sizeof(keyvalues[0]);
+	size_t i;
+	size_t j;
+	size_t nkeys;
+
+	d = ben_dict();
+	pairs = ben_dict_ordered_items(d);
+	assert(pairs != NULL);
+	free(pairs);
+	ben_free(d);
+
+	i = 0;
+	while (keyvalues[i] != NULL) {
+		assert(i < n);
+		d = ben_dict();
+		nkeys = 0;
+		while ((i + 1) < n && keyvalues[i] != NULL) {
+			assert(keyvalues[i +1] != NULL);
+			ben_dict_set_str_by_str(d, keyvalues[i], keyvalues[i + 1]);
+			i += 2;
+			nkeys++;
+		}
+		assert(keyvalues[i] == NULL);
+		i++;
+
+		pairs = ben_dict_ordered_items(d);
+
+		j = 0;
+		while ((i + 1) < n && keyvalues[i] != NULL) {
+			assert(keyvalues[i + 1] != NULL);
+			key = pairs[j].key;
+			value = pairs[j].value;
+			assert(!strcmp(ben_str_val(key), keyvalues[i]));
+			assert(!strcmp(ben_str_val(value), keyvalues[i + 1]));
+			j++;
+			i += 2;
+		}
+		assert(keyvalues[i] == NULL);
+		i++;
+
+		assert(j == nkeys);
+		free(pairs);
+		pairs = NULL;
+		ben_free(d);
+		d = NULL;
+	}
+	assert(i == (n - 1));
+}
+
 static void dict_tests(void)
 {
 	struct bencode *d = ben_dict();
@@ -1038,8 +1105,8 @@ int main(void)
 	print_tests();
 
 	dict_tests();
-
 	dict_tests_2();
+	ben_dict_ordered_items_tests();
 
 	list_tests();
 

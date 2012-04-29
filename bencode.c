@@ -44,11 +44,6 @@ struct ben_encode_ctx {
  */
 #define LONGLONGSIZE 21
 
-struct bencode_keyvalue {
-	struct bencode *key;
-	struct bencode *value;
-};
-
 static struct bencode *decode_printed(struct ben_decode_ctx *ctx);
 static int resize_dict(struct bencode_dict *d, size_t newalloc);
 static int resize_list(struct bencode_list *list, size_t newalloc);
@@ -351,24 +346,36 @@ struct bencode *ben_shared_clone(const struct bencode *b)
 
 static int cmp_dict(const struct bencode *a, const struct bencode *b)
 {
+	size_t len = ben_dict_len(a);
 	size_t pos;
 	struct bencode *key;
 	struct bencode *va;
 	struct bencode *vb;
-	int ret;
+	int ret = 0;
+	struct bencode_keyvalue *pairs;
 
-	if (ben_dict_len(a) != ben_dict_len(b))
-		return (ben_dict_len(a) < ben_dict_len(b)) ? -1 : 1;
+	if (len != ben_dict_len(b)) {
+		/* Returning any non-zero value is allowed */
+		return (len < ben_dict_len(b)) ? -1 : 1;
+	}
 
-	ben_dict_for_each(key, va, pos, a) {
+	pairs = ben_dict_ordered_items(a);
+	for (pos = 0; pos < len; pos++) {
+		key = pairs[pos].key;
+		va = pairs[pos].value;
 		vb = ben_dict_get(b, key);
-		if (vb == NULL)
-			return (a < b) ? -1 : 1;
+		if (vb == NULL) {
+			/* Returning any non-zero value is allowed */
+			ret = (a < b) ? -1 : 1;
+			break;
+		}
 		ret = ben_cmp(va, vb);
 		if (ret)
-			return ret;
+			break;
 	}
-	return 0;
+
+	free(pairs);
+	return ret;
 }
 
 static int cmp_list(const struct bencode *a, const struct bencode *b)
@@ -612,7 +619,7 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 			goto error;
 		}
 
-		if (lastkey != NULL && ben_cmp(lastkey, key) != -1) {
+		if (lastkey != NULL && ben_cmp(lastkey, key) >= 0) {
 			ben_free(key);
 			key = NULL;
 			ctx->error = BEN_INVALID;
@@ -1363,11 +1370,11 @@ static int putstr(struct ben_encode_ctx *ctx, char *s)
 static int print(struct ben_encode_ctx *ctx, const struct bencode *b)
 {
 	const struct bencode_bool *boolean;
-	const struct bencode_dict *dict;
 	const struct bencode_int *integer;
 	const struct bencode_list *list;
 	const struct bencode_str *s;
 	size_t i;
+	size_t len;
 	struct bencode_keyvalue *pairs;
 
 	switch (b->type) {
@@ -1379,34 +1386,28 @@ static int print(struct ben_encode_ctx *ctx, const struct bencode *b)
 		if (ben_put_char(ctx, '{'))
 			return -1;
 
-		dict = ben_dict_const_cast(b);
-
-		pairs = malloc(dict->n * sizeof(pairs[0]));
+		pairs = ben_dict_ordered_items(b);
 		if (pairs == NULL) {
 			warn("No memory for dict serialization\n");
 			return -1;
 		}
-		for (i = 0; i < dict->n; i++) {
-			pairs[i].key = dict->nodes[i].key;
-			pairs[i].value = dict->nodes[i].value;
-		}
-		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
-		for (i = 0; i < dict->n; i++) {
+		len = ben_dict_len(b);
+		for (i = 0; i < len; i++) {
 			if (print(ctx, pairs[i].key))
 				break;
 			if (putstr(ctx, ": "))
 				break;
 			if (print(ctx, pairs[i].value))
 				break;
-			if (i < (dict->n - 1)) {
+			if (i < (len - 1)) {
 				if (putstr(ctx, ", "))
 					break;
 			}
 		}
 		free(pairs);
 		pairs = NULL;
-		if (i < dict->n)
+		if (i < len)
 			return -1;
 
 		return ben_put_char(ctx, '}');
@@ -1528,12 +1529,12 @@ static size_t get_printed_size(const struct bencode *b)
 int ben_ctx_encode(struct ben_encode_ctx *ctx, const struct bencode *b)
 {
 	const struct bencode_bool *boolean;
-	const struct bencode_dict *dict;
 	const struct bencode_int *integer;
 	const struct bencode_list *list;
 	const struct bencode_str *s;
 	const struct bencode_user *u;
 	size_t i;
+	size_t len;
 	struct bencode_keyvalue *pairs;
 
 	switch (b->type) {
@@ -1545,20 +1546,14 @@ int ben_ctx_encode(struct ben_encode_ctx *ctx, const struct bencode *b)
 		if (ben_put_char(ctx, 'd'))
 			return -1;
 
-		dict = ben_dict_const_cast(b);
-
-		pairs = malloc(dict->n * sizeof(pairs[0]));
+		pairs = ben_dict_ordered_items(b);
 		if (pairs == NULL) {
 			warn("No memory for dict serialization\n");
 			return -1;
 		}
-		for (i = 0; i < dict->n; i++) {
-			pairs[i].key = dict->nodes[i].key;
-			pairs[i].value = dict->nodes[i].value;
-		}
-		qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
 
-		for (i = 0; i < dict->n; i++) {
+		len = ben_dict_len(b);
+		for (i = 0; i < len; i++) {
 			if (ben_ctx_encode(ctx, pairs[i].key))
 				break;
 			if (ben_ctx_encode(ctx, pairs[i].value))
@@ -1566,7 +1561,7 @@ int ben_ctx_encode(struct ben_encode_ctx *ctx, const struct bencode *b)
 		}
 		free(pairs);
 		pairs = NULL;
-		if (i < dict->n)
+		if (i < len)
 			return -1;
 
 		return ben_put_char(ctx, 'e');
@@ -1792,6 +1787,24 @@ struct bencode *ben_dict_get_by_int(const struct bencode *dict, long long key)
 	struct bencode_int i;
 	inplace_ben_int(&i, key);
 	return ben_dict_get(dict, (struct bencode *) &i);
+}
+
+struct bencode_keyvalue *ben_dict_ordered_items(const struct bencode *b)
+{
+	struct bencode_keyvalue *pairs;
+	size_t i;
+	const struct bencode_dict *dict = ben_dict_const_cast(b);
+	if (dict == NULL)
+		return NULL;
+	pairs = malloc(dict->n * sizeof(pairs[0]));
+	if (pairs == NULL)
+		return NULL;
+	for (i = 0; i < dict->n; i++) {
+		pairs[i].key = dict->nodes[i].key;
+		pairs[i].value = dict->nodes[i].value;
+	}
+	qsort(pairs, dict->n, sizeof(pairs[0]), ben_cmp_qsort);
+	return pairs;
 }
 
 static size_t dict_find_pos(struct bencode_dict *d,
