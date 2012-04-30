@@ -127,9 +127,7 @@ char ben_current_char(const struct ben_decode_ctx *ctx)
 
 const char *ben_current_buf(const struct ben_decode_ctx *ctx, size_t n)
 {
-	if (ben_need_bytes(ctx, n))
-		return NULL;
-	return ctx->data + ctx->off;
+	return ben_need_bytes(ctx, n) ? NULL : ctx->data + ctx->off;
 }
 
 void ben_skip(struct ben_decode_ctx *ctx, size_t n)
