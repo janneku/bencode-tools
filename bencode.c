@@ -464,7 +464,7 @@ static struct bencode *decode_bool(struct ben_decode_ctx *ctx)
 	char c;
 	if (ben_need_bytes(ctx, 2))
 		return ben_insufficient_ptr(ctx);
-	ctx->off += 1;
+	ctx->off++;
 
 	c = ben_current_char(ctx);
 	if (c != '0' && c != '1')
@@ -476,7 +476,7 @@ static struct bencode *decode_bool(struct ben_decode_ctx *ctx)
 		return ben_oom_ptr(ctx);
 
 	b->b = value;
-	ctx->off += 1;
+	ctx->off++;
 	return (struct bencode *) b;
 }
 
@@ -603,7 +603,7 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 		return ben_oom_ptr(ctx);
 	}
 
-	ctx->off += 1;
+	ctx->off++;
 
 	while (ctx->off < ctx->len && ben_current_char(ctx) != 'e') {
 		key = ben_ctx_decode(ctx);
@@ -647,7 +647,7 @@ static struct bencode *decode_dict(struct ben_decode_ctx *ctx)
 		goto error;
 	}
 
-	ctx->off += 1;
+	ctx->off++;
 
 	return (struct bencode *) d;
 
@@ -709,7 +709,7 @@ static struct bencode *decode_int(struct ben_decode_ctx *ctx)
 {
 	struct bencode_int *b;
 	long long ll;
-	ctx->off += 1;
+	ctx->off++;
 	if (read_long_long(&ll, ctx, 'e'))
 		return NULL;
 	b = alloc(BENCODE_INT);
@@ -751,7 +751,7 @@ static struct bencode *decode_list(struct ben_decode_ctx *ctx)
 	if (l == NULL)
 		return ben_oom_ptr(ctx);
 
-	ctx->off += 1;
+	ctx->off++;
 
 	while (ctx->off < ctx->len && ben_current_char(ctx) != 'e') {
 		struct bencode *b = ben_ctx_decode(ctx);
@@ -769,7 +769,7 @@ static struct bencode *decode_list(struct ben_decode_ctx *ctx)
 		goto error;
 	}
 
-	ctx->off += 1;
+	ctx->off++;
 	return (struct bencode *) l;
 
 error:
@@ -854,7 +854,7 @@ struct bencode *ben_ctx_decode(struct ben_decode_ctx *ctx)
 		if (ctx->types && (unsigned char) c < 128) {
 			type = ctx->types[(unsigned char) c];
 			if (type) {
-				ctx->off += 1;
+				ctx->off++;
 				b = type->decode(ctx);
 			} else
 				return ben_invalid_ptr(ctx);
@@ -1323,7 +1323,7 @@ int ben_put_char(struct ben_encode_ctx *ctx, char c)
 	if (ctx->pos >= ctx->size)
 		return -1;
 	ctx->data[ctx->pos] = c;
-	ctx->pos += 1;
+	ctx->pos++;
 	return 0;
 }
 
@@ -1475,7 +1475,7 @@ static size_t get_printed_size(const struct bencode *b)
 		boolean = ben_bool_const_cast(b);
 		return boolean->b ? 4 : 5; /* "True" and "False" */
 	case BENCODE_DICT:
-		size += 1; /* "{" */
+		size++; /* "{" */
 		d = ben_dict_const_cast(b);
 		for (pos = 0; pos < d->n; pos++) {
 			size += get_printed_size(d->nodes[pos].key);
@@ -1484,24 +1484,24 @@ static size_t get_printed_size(const struct bencode *b)
 			if (pos < (d->n - 1))
 				size += 2; /* ", " */
 		}
-		size += 1; /* "}" */
+		size++; /* "}" */
 		return size;
 	case BENCODE_INT:
 		i = ben_int_const_cast(b);
 		return snprintf(buf, 0, "%lld", i->ll);
 	case BENCODE_LIST:
-		size += 1; /* "[" */
+		size++; /* "[" */
 		l = ben_list_const_cast(b);
 		for (pos = 0; pos < l->n; pos++) {
 			size += get_printed_size(l->values[pos]);
 			if (pos < (l->n - 1))
 				size += 2; /* ", " */
 		}
-		size += 1; /* "]" */
+		size++; /* "]" */
 		return size;
 	case BENCODE_STR:
 		s = ben_str_const_cast(b);
-		size += 1; /* ' */
+		size++; /* ' */
 		for (pos = 0; pos < s->len; pos++) {
 			if (!isprint(s->s[pos])) {
 				size += 4; /* "\xDD" */
@@ -1513,11 +1513,11 @@ static size_t get_printed_size(const struct bencode *b)
 				size += 2; /* escaped characters */
 				break;
 			default:
-				size += 1;
+				size++;
 				break;
 			}
 		}
-		size += 1; /* ' */
+		size++; /* ' */
 		return size;
 	default:
 		die("Unknown type: %c\n", b->type);
@@ -2018,7 +2018,7 @@ int ben_list_append(struct bencode *list, struct bencode *b)
 		return -1;
 	assert(b != NULL);
 	l->values[l->n] = b;
-	l->n += 1;
+	l->n++;
 	return 0;
 }
 
