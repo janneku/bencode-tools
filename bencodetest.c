@@ -1059,6 +1059,7 @@ static void cmp_tests(void)
 	ben_dict_set_str_by_str(d, "0", "a");
 	ben_dict_set_str_by_str(d, "1", "d");
 	cmptest(c, d, 1);
+	ben_free(c);
 
 	ben_free(b);
 }
