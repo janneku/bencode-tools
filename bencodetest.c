@@ -744,8 +744,11 @@ static void clone_tests(void)
 
 static void alloc_tests(void)
 {
+	struct bencode *b;
 	struct bencode *list;
 	struct bencode *dict;
+	int i;
+	size_t oldalloc;
 
 	list = ben_list();
 	assert(ben_allocate(list, 1) == 0);
@@ -771,6 +774,29 @@ static void alloc_tests(void)
 	assert(!ben_dict_set_str_by_str(dict, "a", "0"));
 	assert(!ben_dict_set_str_by_str(dict, "b", "1"));
 	assert(ben_allocate(dict, 1)); /* Truncation fails */
+	ben_free(dict);
+
+	/*
+	 * Insert 8 items, remove 6, check that internal allocation size
+	 * decreased after removal.
+	 */
+	dict = ben_dict();
+	for (i = 0; i < 8; i++) {
+		char number[4];
+		snprintf(number, sizeof number, "%d", i);
+		assert(!ben_dict_set_str_by_str(dict, number, number));
+	}
+	assert(ben_dict_len(dict) == 8);
+	oldalloc = ben_dict_const_cast(dict)->alloc;
+	for (i = 0; i < 6; i++) {
+		char number[4];
+		snprintf(number, sizeof number, "%d", i);
+		b = ben_dict_pop_by_str(dict, number);
+		assert(b != NULL);
+		ben_free(b);
+	}
+	assert(ben_dict_len(dict) == 2);
+	assert(ben_dict_const_cast(dict)->alloc < oldalloc);
 	ben_free(dict);
 }
 

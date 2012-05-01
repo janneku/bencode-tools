@@ -1896,7 +1896,11 @@ static struct bencode *dict_pop(struct bencode_dict *d,
 		d->buckets[tailbucket] = removepos;
 	}
 
-	d->n -= 1;
+	d->n--;
+
+	if (d->n <= (d->alloc / 4) && d->alloc >= 8)
+		resize_dict(d, d->alloc / 2);
+
 	return value;
 }
 
