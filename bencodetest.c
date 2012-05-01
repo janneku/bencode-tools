@@ -757,12 +757,20 @@ static void alloc_tests(void)
 	ben_free(list);
 
 	dict = ben_dict();
+	assert(!ben_dict_set_str_by_str(dict, "a", "0"));
 	assert(ben_allocate(dict, 1) == 0);
 	assert(ben_dict_cast(dict)->alloc == 1);
 	assert(ben_allocate(dict, 64) == 0);
 	assert(ben_dict_cast(dict)->alloc == 64);
 	assert(ben_allocate(dict, 1) == 0);
 	assert(ben_dict_cast(dict)->alloc == 1);
+	assert(ben_dict_len(dict) == 1);
+	ben_free(dict);
+
+	dict = ben_dict();
+	assert(!ben_dict_set_str_by_str(dict, "a", "0"));
+	assert(!ben_dict_set_str_by_str(dict, "b", "1"));
+	assert(ben_allocate(dict, 1)); /* Truncation fails */
 	ben_free(dict);
 }
 
