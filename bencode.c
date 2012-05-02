@@ -2270,6 +2270,8 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 		if (unpack(val, ctx, vl))
 			return -1;
 
+		if (seek_char(ctx))
+			return 0;
 		if (ben_current_char(ctx) == ',')
 			ctx->off++;
 		else if (ben_current_char(ctx) != '}')
@@ -2291,15 +2293,15 @@ static int unpack_list(const struct bencode *b, struct ben_decode_ctx *ctx,
 	ctx->off++;
 
 	for (i = 0; i < list->n; ++i) {
-		if (i > 0) {
-			if (ben_current_char(ctx) != ',')
-				return invalid(ctx);
-			ctx->off++;
-			if (seek_char(ctx))
-				return insufficient(ctx);
-		}
 		if (unpack(list->values[i], ctx, vl))
 			return -1;
+
+		if (seek_char(ctx))
+			return 0;
+		if (ben_current_char(ctx) == ',')
+			ctx->off++;
+		else if (ben_current_char(ctx) != ']')
+			return invalid(ctx);
 	}
 	if (seek_char(ctx))
 		return 0;
