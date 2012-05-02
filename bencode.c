@@ -2228,7 +2228,7 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 
 	while (1) {
 		if (seek_char(ctx))
-			return insufficient(ctx);
+			return 0;
 
 		if (ben_current_char(ctx) == '}') {
 			ctx->off++;
@@ -2262,7 +2262,7 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 			return -1;
 
 		if (seek_char(ctx))
-			return insufficient(ctx);
+			return 0;
 		if (ben_current_char(ctx) != ':')
 			return invalid(ctx);
 		ctx->off++;
@@ -2302,7 +2302,7 @@ static int unpack_list(const struct bencode *b, struct ben_decode_ctx *ctx,
 			return -1;
 	}
 	if (seek_char(ctx))
-		return insufficient(ctx);
+		return 0;
 
 	if (ben_current_char(ctx) != ']')
 		return -1;
