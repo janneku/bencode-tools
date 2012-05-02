@@ -11,6 +11,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* Used to verify format strings in compile time */
+#ifdef __GNUC__
+#define CHECK_FORMAT(args...)  __attribute__ ((format( args )))
+#else
+#define CHECK_FORMAT(args...)
+#endif
+
 enum {
 	BENCODE_BOOL = 1,
 	BENCODE_DICT,
@@ -315,6 +322,38 @@ struct bencode *ben_str(const char *s);
 
 /* Return a human readable explanation of error returned with ben_decode2() */
 const char *ben_strerror(int error);
+
+/*
+ * Unpack a Bencoded structure similar to scanf(). Takes a format string and
+ * a list of pointers as variable arguments. The given b structure is checked
+ * against the format and values are unpacked using the given specifiers.
+ * A specifier begins with a percent (%) that follows a string of specifier
+ * characters documented below.
+ * The syntax is similar to Python format for recursive data structures, and
+ * consists of tokens {, }, [, ] with any number of spaces between them.
+ * The keys of a dictionary are given as literal strings or integers and
+ * matched against the keys of the Bencoded structure.
+ *
+ * Unpack modifiers:
+ *     l    The integer is of type long or unsigned long, and the type of the
+ *          argument is expected to be long * or unsigned long *.
+ *     ll   The integer is a long long or an unsigned long long, and the
+ *          argument is long long * or unsigned long long *.
+ *     L    Same as ll.
+ *     q    Same as ll.
+ *
+ * Unpack specifiers:
+ *     p    The Bencode value must be a string and a pointer to a string
+ *          (char **) is expected to be given as arguments. Note, returns a
+ *          reference to the internal string buffer. The returned memory should
+ *          not be freed and it has the same life time as the Bencode string.
+ *
+ *     d    The bencode value is expected to be a (signed) integer. The
+ *          preceeding conversion modifiers define the type of the given
+ *          pointer.
+ */
+int ben_unpack(const struct bencode *b, const char *fmt, ...)
+	CHECK_FORMAT(scanf, 2, 3);
 
 /* ben_is_bool() returns 1 iff b is a boolean, 0 otherwise */
 static inline int ben_is_bool(const struct bencode *b)

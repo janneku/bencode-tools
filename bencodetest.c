@@ -1098,6 +1098,43 @@ static void cmp_tests(void)
 	ben_free(b);
 }
 
+void unpack_tests(void)
+{
+	const char *s = "d6:author5:Alice6:lengthi100000e4:name8:spam.mp3e";
+	const char *s2 = "l5:Alice8:spam.mp3e";
+	struct bencode *b;
+	char *author;
+	char *name;
+	long length;
+
+	b = ben_decode(s, strlen(s));
+	assert(b != NULL);
+
+	assert(ben_unpack(b, "{\"author\": %p, \"name\": %p, \"length\": %ld}",
+			  &author, &name, &length) == 0);
+	assert(strcmp(author, "Alice") == 0);
+	assert(strcmp(name, "spam.mp3") == 0);
+	assert(length == 100000);
+
+	assert(ben_unpack(b, "{\"author\": %p, \"foo\": %p}",
+			  &author, &name) < 0);
+
+	assert(ben_unpack(b, "%ld", &length) < 0);
+	ben_free(b);
+
+	b = ben_decode(s2, strlen(s2));
+	assert(b != NULL);
+
+	assert(ben_unpack(b, "[%p, %p]", &author, &name) == 0);
+	assert(strcmp(author, "Alice") == 0);
+	assert(strcmp(name, "spam.mp3") == 0);
+
+	assert(ben_unpack(b, "[%p]", &author) < 0);
+	assert(ben_unpack(b, "[%p, %ld]", &author, &length) < 0);
+	assert(ben_unpack(b, "[%p, %p, %ld]", &author, &name, &length) < 0);
+	ben_free(b);
+}
+
 int main(void)
 {
 	assert(ben_decode("i0e ", 4) == NULL);
@@ -1172,6 +1209,8 @@ int main(void)
 	user_tests();
 
 	cmp_tests();
+
+	unpack_tests();
 
 	return 0;
 }
