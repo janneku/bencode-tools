@@ -1116,6 +1116,7 @@ static struct bencode *decode_printed_list(struct ben_decode_ctx *ctx)
 				return NULL;
 			}
 			if (ben_list_append(l, b)) {
+				ben_free(b);
 				ben_free(l);
 				return ben_oom_ptr(ctx);
 			}
