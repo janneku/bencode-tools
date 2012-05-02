@@ -2117,7 +2117,7 @@ const char *ben_strerror(int error)
 static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			va_list *vl)
 {
-	char **str;
+	const char **str;
 	long long val;
 	long long *ll;
 	long *l;
@@ -2145,7 +2145,7 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			ctx->off++;
 			if (b->type != BENCODE_STR)
 				return invalid(ctx);
-			str = va_arg(*vl, char **);
+			str = va_arg(*vl, const char **);
 			*str = ben_str_val(b);
 			return 0;
 
