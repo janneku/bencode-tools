@@ -933,7 +933,6 @@ static struct bencode *decode_printed_bool(struct ben_decode_ctx *ctx)
 static struct bencode *decode_printed_dict(struct ben_decode_ctx *ctx)
 {
 	struct bencode *d = ben_dict();
-	int dictstate = 0; /* 0 == key, 1 == colon, 2 == value, 3 == comma */
 	struct bencode *key = NULL;
 	struct bencode *value = NULL;
 
@@ -945,55 +944,41 @@ static struct bencode *decode_printed_dict(struct ben_decode_ctx *ctx)
 	while (1) {
 		if (seek_char(ctx))
 			goto nullpath;
-
-		switch (dictstate) {
-		case 0:
-			if (ben_current_char(ctx) == '}') {
-				ctx->off++;
-				goto exit;
-			}
-			key = decode_printed(ctx);
-			if (key == NULL)
-				goto nullpath;
-			dictstate = 1;
-			break;
-		case 1:
-			if (ben_current_char(ctx) != ':')
-				goto invalidpath;
+		if (ben_current_char(ctx) == '}') {
 			ctx->off++;
-			dictstate = 2;
 			break;
-		case 2:
-			value = decode_printed(ctx);
-			if (value == NULL)
-				goto nullpath;
-			assert(key != NULL);
-			if (ben_dict_set(d, key, value)) {
-				ben_free(key);
-				ben_free(value);
-				ben_free(d);
-				return ben_oom_ptr(ctx);
-			}
-			key = NULL;
-			value = NULL;
-			dictstate = 3;
-			break;
-		case 3:
-			if (ben_current_char(ctx) == '}') {
-				ctx->off++;
-				goto exit;
-			}
-			if (ben_current_char(ctx) != ',')
-				goto invalidpath;
-			ctx->off++;
-			dictstate = 0;
-			break;
-		default:
-			die("Invalid dictstate: %d\n", dictstate);
 		}
-	}
 
-exit:
+		key = decode_printed(ctx);
+		if (key == NULL)
+			goto nullpath;
+
+		if (seek_char(ctx))
+			goto nullpath;
+		if (ben_current_char(ctx) != ':')
+			goto invalidpath;
+		ctx->off++;
+
+		value = decode_printed(ctx);
+		if (value == NULL)
+			goto nullpath;
+
+		if (ben_dict_set(d, key, value)) {
+			ben_free(key);
+			ben_free(value);
+			ben_free(d);
+			return ben_oom_ptr(ctx);
+		}
+		key = NULL;
+		value = NULL;
+
+		if (seek_char(ctx))
+			goto nullpath;
+		if (ben_current_char(ctx) == ',')
+			ctx->off++;
+		else if (ben_current_char(ctx) != '}')
+			goto invalidpath;
+	}
 	return d;
 
 invalidpath:
@@ -1085,8 +1070,7 @@ returnwithval:
 static struct bencode *decode_printed_list(struct ben_decode_ctx *ctx)
 {
 	struct bencode *l = ben_list();
-	int requirecomma = 0;
-	struct bencode *b;
+	struct bencode *b = NULL;
 
 	if (l == NULL)
 		return ben_oom_ptr(ctx);
@@ -1094,36 +1078,37 @@ static struct bencode *decode_printed_list(struct ben_decode_ctx *ctx)
 	ctx->off++;
 
 	while (1) {
-		if (seek_char(ctx)) {
-			ben_free(l);
-			return NULL;
-		}
+		if (seek_char(ctx))
+			goto nullpath;
 		if (ben_current_char(ctx) == ']') {
 			ctx->off++;
 			break;
 		}
-		if (requirecomma) {
-			if (ben_current_char(ctx) != ',') {
-				ben_free(l);
-				return ben_invalid_ptr(ctx);
-			}
+		b = decode_printed(ctx);
+		if (b == NULL)
+			goto nullpath;
+		if (ben_list_append(l, b)) {
+			ben_free(b);
+			ben_free(l);
+			return ben_oom_ptr(ctx);
+		}
+		b = NULL;
+
+		if (seek_char(ctx))
+			goto nullpath;
+		if (ben_current_char(ctx) == ',')
 			ctx->off++;
-			requirecomma = 0;
-		} else {
-			b = decode_printed(ctx);
-			if (b == NULL) {
-				ben_free(l);
-				return NULL;
-			}
-			if (ben_list_append(l, b)) {
-				ben_free(b);
-				ben_free(l);
-				return ben_oom_ptr(ctx);
-			}
-			requirecomma = 1;
+		else if (ben_current_char(ctx) != ']') {
+			ben_free(l);
+			return ben_invalid_ptr(ctx);
 		}
 	}
 	return l;
+
+nullpath:
+	ben_free(b);
+	ben_free(l);
+	return NULL;
 }
 
 static struct bencode *decode_printed_str(struct ben_decode_ctx *ctx)
