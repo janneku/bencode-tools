@@ -1093,7 +1093,7 @@ static struct bencode *decode_printed_list(struct ben_decode_ctx *ctx)
 
 	ctx->off++;
 
-	while (ctx->off < ctx->len) {
+	while (1) {
 		if (seek_char(ctx)) {
 			ben_free(l);
 			return NULL;
