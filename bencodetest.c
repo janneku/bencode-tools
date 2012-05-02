@@ -581,6 +581,7 @@ static void decode_printed_tests(void)
 		/* list tests */
 		{.s = "[]", .l = 2},
 		{.s = "[,]", .l = 3, .e = BEN_INVALID},
+		{.s = "[", .l = 1, .e = BEN_INSUFFICIENT},
 		{.s = "[1]", .l = 3},
 		{.s = "[1,]", .l = 4},
 		{.s = "[1,2]", .l = 5},
@@ -627,6 +628,8 @@ static void decode_printed_tests(void)
 		/* dict tests */
 		{.s = "{}", .l = 2},
 		{.s = "{1: 2}", .l = 6},
+		{.s = "{1: 2,}", .l = 7},
+		{.s = "{1: 2, 3: 4}", .l = 12},
 		{.s = "{", .l = 1, .e = BEN_INSUFFICIENT},
 		{.s = "{'", .l = 2, .e = BEN_INSUFFICIENT},
 		{.s = "{'a", .l = 3, .e = BEN_INSUFFICIENT},
