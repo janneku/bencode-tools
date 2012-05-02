@@ -2219,7 +2219,6 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 {
 	struct bencode *key = NULL;
 	const struct bencode *val;
-	int requirecomma = 0;
 
 	if (b->type != BENCODE_DICT)
 		return invalid(ctx);
@@ -2233,13 +2232,6 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 		if (ben_current_char(ctx) == '}') {
 			ctx->off++;
 			break;
-		}
-		if (requirecomma) {
-			if (ben_current_char(ctx) != ',')
-				return invalid(ctx);
-			ctx->off++;
-			if (seek_char(ctx))
-				return insufficient(ctx);
 		}
 		switch (ben_current_char(ctx)) {
 		case '"':
@@ -2277,7 +2269,10 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 		if (unpack(val, ctx, vl))
 			return -1;
 
-		requirecomma = 1;
+		if (ben_current_char(ctx) == ',')
+			ctx->off++;
+		else if (ben_current_char(ctx) != '}')
+			return invalid(ctx);
 	}
 	return 0;
 }
