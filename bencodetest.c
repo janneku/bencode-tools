@@ -1105,12 +1105,64 @@ static void cmp_tests(void)
 
 void unpack_tests(void)
 {
+	struct test {
+		char *encoded;
+		size_t len;
+		char *fmt;
+		int e;
+	};
+	/* each format string must refer to at most three strings */
+	const struct test table[] = {
+		{.encoded = "l3:fooe", .len = -1, .fmt = "[%p, ]"},
+		{.encoded = "l3:fooe", .len = -1, .fmt = "[%d, ]", .e = 1},
+		{.encoded = "ldee", .len = -1, .fmt = "[{}]"},
+		{.encoded = "ldee", .len = -1, .fmt = "[", .e = 1},
+		{.encoded = "de", .len = -1, .fmt = "{", .e = 1},
+		{.encoded = "ldee", .len = -1, .fmt = "[]", .e = 1},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %p}"},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'error': %p}", .e = 1},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %d}", .e = 1},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{ 'foo': %p }"},
+		{.encoded = "d3:foo3:bar3:keyi123ee", .len = -1, .fmt = "{'foo': %p}"},
+		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[%p, %p]"},
+		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[ %p, %p ] "},
+		{.encoded = "l3:food3:key3:valee", .len = -1, .fmt = "[%p, {'key': %p}]"},
+		{.encoded = NULL,},
+	};
 	const char *s = "d6:author5:Alice6:lengthi100000e4:name8:spam.mp3e";
 	const char *s2 = "l5:Alice8:spam.mp3e";
-	struct bencode *b;
+
 	char *author;
 	char *name;
 	long length;
+	size_t i;
+	char *str1;
+	char *str2;
+	char *str3;
+	struct bencode *b;
+
+	for (i = 0; table[i].encoded != NULL; i++) {
+		const char *encoded = table[i].encoded;
+		size_t len = table[i].len;
+		const char *fmt = table[i].fmt;
+		if (len == -1)
+			len = strlen(encoded);
+		b = ben_decode(encoded, len);
+		if (b == NULL) {
+			fprintf(stderr, "Failed to decode: %s\n", encoded);
+			exit(1);
+		}
+		if (ben_unpack(b, fmt, &str1, &str2, &str3)) {
+			if (table[i].e == 0) {
+				fprintf(stderr, "Failed to unpack: %s\n", fmt);
+				exit(1);
+			}
+		} else if (table[i].e) {
+			fprintf(stderr, "Unexpected unpack success: %s\n", fmt);
+			exit(1);
+		}
+		ben_free(b);
+	}
 
 	b = ben_decode(s, strlen(s));
 	assert(b != NULL);
@@ -1120,23 +1172,13 @@ void unpack_tests(void)
 	assert(strcmp(author, "Alice") == 0);
 	assert(strcmp(name, "spam.mp3") == 0);
 	assert(length == 100000);
-
-	assert(ben_unpack(b, "{\"author\": %p, \"foo\": %p}",
-			  &author, &name) < 0);
-
-	assert(ben_unpack(b, "%ld", &length) < 0);
 	ben_free(b);
 
 	b = ben_decode(s2, strlen(s2));
 	assert(b != NULL);
-
 	assert(ben_unpack(b, "[%p, %p]", &author, &name) == 0);
 	assert(strcmp(author, "Alice") == 0);
 	assert(strcmp(name, "spam.mp3") == 0);
-
-	assert(ben_unpack(b, "[%p]", &author) < 0);
-	assert(ben_unpack(b, "[%p, %ld]", &author, &length) < 0);
-	assert(ben_unpack(b, "[%p, %p, %ld]", &author, &name, &length) < 0);
 	ben_free(b);
 }
 
