@@ -2158,8 +2158,6 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			case 2:
 				ll = va_arg(*vl, long long *);
 				*ll = val;
-				if ((long long) *ll != val)
-					return invalid(ctx);
 				break;
 			}
 			return 0;
@@ -2188,8 +2186,6 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			case 2:
 				ull = va_arg(*vl, unsigned long long *);
 				*ull = val;
-				if ((long long) *ull != val)
-					return invalid(ctx);
 				break;
 			}
 			return 0;
