@@ -1188,7 +1188,7 @@ void pack_tests(void)
 	char *encoded;
 	size_t len;
 	const char *s = "d6:author5:Alice6:lengthi100000e4:name8:spam.mp3e";
-	const char *s2 = "l5:Alice8:spam.mp3e";
+	const char *s2 = "l5:Alice8:spam.mp3b0e";
 
 	b = ben_pack("{'author': %s, 'name': 'spam.mp3', 'length': %d}",
 		     "Alice", 100000);
@@ -1200,7 +1200,7 @@ void pack_tests(void)
 	assert(memcmp(encoded, s, len) == 0);
 	free(encoded);
 
-	b = ben_pack("[%s, 'spam.mp3']", "Alice");
+	b = ben_pack("[%s, 'spam.mp3', False]", "Alice");
 	assert(b != NULL);
 
 	encoded = ben_encode(&len, b);

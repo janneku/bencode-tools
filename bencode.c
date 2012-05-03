@@ -2549,6 +2549,9 @@ static struct bencode *pack(struct ben_decode_ctx *ctx, va_list *vl)
 	case '8':
 	case '9':
 		return decode_printed_int(ctx);
+	case 'F':
+	case 'T':
+		return decode_printed_bool(ctx);
 	case '{':
 		return pack_dict(ctx, vl);
 	case '[':
