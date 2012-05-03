@@ -351,9 +351,40 @@ const char *ben_strerror(int error);
  *     d    The bencode value is expected to be a (signed) integer. The
  *          preceeding conversion modifiers define the type of the given
  *          pointer.
+
+ *     u    The bencode value is expected to be an unsigned integer. The
+ *          preceeding conversion modifiers define the type of the given
+ *          pointer.
  */
 int ben_unpack(const struct bencode *b, const char *fmt, ...)
 	CHECK_FORMAT(scanf, 2, 3);
+
+/*
+ * Pack a Bencoded structure similar to printf(). Takes a format string and
+ * a list of values as variable arguments.
+ * Works similarly to ben_decode_printed(), but allows the string to values
+ * specifiers which are replaced with values given as arguments.
+ * A specifier begins with a percent (%) that follows a string of specifier
+ * characters documented below.
+ *
+ * Value modifiers:
+ *     l    The integer is of type long or unsigned long.
+ *     ll   The integer is a long long or an unsigned long long.
+ *     L    Same as ll.
+ *     q    Same as ll.
+ *
+ * Value specifiers:
+ *     s    A string pointer (char *) expected to be given as arguments. A new
+ *          Bencode string is constructed from the given string.
+ *
+ *     d    Constructs a new integer from the given (signed) integer. The
+ *          preceeding conversion modifiers define the type of the value.
+
+ *     u    Constructs a new integer from the given unsigned integer. The
+ *          preceeding conversion modifiers define the type of the value.
+ */
+struct bencode *ben_pack(const char *fmt, ...)
+	CHECK_FORMAT(printf, 1, 2);
 
 /* ben_is_bool() returns 1 iff b is a boolean, 0 otherwise */
 static inline int ben_is_bool(const struct bencode *b)

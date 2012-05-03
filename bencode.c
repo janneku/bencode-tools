@@ -50,6 +50,7 @@ static int resize_dict(struct bencode_dict *d, size_t newalloc);
 static int resize_list(struct bencode_list *list, size_t newalloc);
 static int unpack(const struct bencode *b, struct ben_decode_ctx *ctx,
 		  va_list *vl);
+static struct bencode *pack(struct ben_decode_ctx *ctx, va_list *vl);
 
 static size_t type_size(int type)
 {
@@ -2331,4 +2332,249 @@ int ben_unpack(const struct bencode *b, const char *fmt, ...)
 	if (ctx.off < ctx.len)
 		ret = -1;
 	return ret;
+}
+
+static struct bencode *pack_value(struct ben_decode_ctx *ctx, va_list *vl)
+{
+	struct bencode *b = NULL;
+	unsigned long long ull;
+	long long val;
+	int longflag = 0;
+
+	ctx->off++;
+
+	while (ctx->off < ctx->len) {
+		switch (ben_current_char(ctx)) {
+		case 'l':
+			ctx->off++;
+			longflag++;
+			break;
+		case 'L':
+		case 'q':
+			ctx->off++;
+			longflag = 2;
+			break;
+
+		case 's':
+			ctx->off++;
+			b = ben_str(va_arg(*vl, const char *));
+			if (b == NULL)
+				return ben_oom_ptr(ctx);
+			break;
+
+		/* signed */
+		case 'd':
+			ctx->off++;
+			switch (longflag) {
+			case 0:
+				val = va_arg(*vl, int);
+				break;
+			case 1:
+				val = va_arg(*vl, long);
+				break;
+			case 2:
+				val = va_arg(*vl, long long);
+				break;
+			default:
+				return ben_invalid_ptr(ctx);
+			}
+			b = ben_int(val);
+			if (b == NULL)
+				return ben_oom_ptr(ctx);
+			break;
+
+		/* unsigned */
+		case 'u':
+			ctx->off++;
+			switch (longflag) {
+			case 0:
+				val = va_arg(*vl, unsigned int);
+				break;
+			case 1:
+				val = va_arg(*vl, unsigned long);
+				break;
+			case 2:
+				ull = va_arg(*vl, unsigned long long);
+				/* Check that no information was lost */
+				val = ull;
+				if ((long long) ull != val)
+					return ben_invalid_ptr(ctx);
+				break;
+			default:
+				return ben_invalid_ptr(ctx);
+			}
+			b = ben_int(val);
+			if (b == NULL)
+				return ben_oom_ptr(ctx);
+			break;
+
+		default:
+			return ben_invalid_ptr(ctx);
+		}
+		if (b)
+			return b;
+	}
+	return NULL;
+}
+
+static struct bencode *pack_dict(struct ben_decode_ctx *ctx, va_list *vl)
+{
+	struct bencode *d = ben_dict();
+	struct bencode *key = NULL;
+	struct bencode *value = NULL;
+
+	if (d == NULL)
+		return ben_oom_ptr(ctx);
+
+	ctx->off++;
+
+	while (1) {
+		if (seek_char(ctx))
+			goto nullpath;
+
+		if (ben_current_char(ctx) == '}') {
+			ctx->off++;
+			break;
+		}
+		key = pack(ctx, vl);
+		if (key == NULL)
+			goto nullpath;
+
+		if (seek_char(ctx))
+			goto nullpath;
+		if (ben_current_char(ctx) != ':')
+			goto invalidpath;
+		ctx->off++;
+
+		value = pack(ctx, vl);
+		if (value == NULL)
+			goto nullpath;
+
+		if (ben_dict_set(d, key, value)) {
+			ben_free(key);
+			ben_free(value);
+			ben_free(d);
+			return ben_oom_ptr(ctx);
+		}
+		key = NULL;
+		value = NULL;
+
+		if (seek_char(ctx))
+			goto nullpath;
+		if (ben_current_char(ctx) == ',')
+			ctx->off++;
+		else if (ben_current_char(ctx) != '}')
+			goto invalidpath;
+	}
+	return d;
+
+nullpath:
+	ben_free(d);
+	ben_free(key);
+	ben_free(value);
+	return NULL;
+
+invalidpath:
+	ben_free(d);
+	ben_free(key);
+	ben_free(value);
+	return ben_invalid_ptr(ctx);
+}
+
+static struct bencode *pack_list(struct ben_decode_ctx *ctx, va_list *vl)
+{
+	struct bencode *l = ben_list();
+	struct bencode *val = NULL;
+
+	if (l == NULL)
+		return ben_oom_ptr(ctx);
+
+	ctx->off++;
+
+	while (1) {
+		if (seek_char(ctx))
+			goto nullpath;
+
+		if (ben_current_char(ctx) == ']') {
+			ctx->off++;
+			break;
+		}
+		val = pack(ctx, vl);
+		if (val == NULL)
+			goto nullpath;
+
+		if (ben_list_append(l, val)) {
+			ben_free(val);
+			ben_free(l);
+			return ben_oom_ptr(ctx);
+		}
+		val = NULL;
+
+		if (seek_char(ctx))
+			goto nullpath;
+		if (ben_current_char(ctx) == ',')
+			ctx->off++;
+		else if (ben_current_char(ctx) != ']') {
+			ben_free(l);
+			return ben_invalid_ptr(ctx);
+		}
+	}
+
+	return l;
+
+nullpath:
+	ben_free(l);
+	ben_free(val);
+	return NULL;
+}
+
+static struct bencode *pack(struct ben_decode_ctx *ctx, va_list *vl)
+{
+	if (seek_char(ctx))
+		return ben_insufficient_ptr(ctx);
+
+	switch (ben_current_char(ctx)) {
+	case '\'':
+	case '"':
+		return decode_printed_str(ctx);
+	case '-':
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		return decode_printed_int(ctx);
+	case '{':
+		return pack_dict(ctx, vl);
+	case '[':
+		return pack_list(ctx, vl);
+	case '%':
+		return pack_value(ctx, vl);
+	default:
+		return ben_invalid_ptr(ctx);
+	}
+	return NULL;
+}
+
+struct bencode *ben_pack(const char *fmt, ...)
+{
+	struct ben_decode_ctx ctx = {.data = fmt, .len = strlen(fmt)};
+	struct bencode *b;
+	va_list vl;
+	va_start(vl, fmt);
+	b = pack(&ctx, &vl);
+	va_end(vl);
+
+	/* check for left over characters */
+	seek_char(&ctx);
+	if (ctx.off < ctx.len) {
+		ben_free(b);
+		return NULL;
+	}
+	return b;
 }
