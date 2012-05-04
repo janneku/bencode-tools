@@ -13,9 +13,9 @@
 
 /* Used to verify format strings in compile time */
 #ifdef __GNUC__
-#define CHECK_FORMAT(args...)  __attribute__ ((format( args )))
+#define BEN_CHECK_FORMAT(args...)  __attribute__ ((format( args )))
 #else
-#define CHECK_FORMAT(args...)
+#define BEN_CHECK_FORMAT(args...)
 #endif
 
 enum {
@@ -357,7 +357,7 @@ const char *ben_strerror(int error);
  *          pointer.
  */
 int ben_unpack(const struct bencode *b, const char *fmt, ...)
-	CHECK_FORMAT(scanf, 2, 3);
+	BEN_CHECK_FORMAT(scanf, 2, 3);
 
 /*
  * Pack a Bencoded structure similar to printf(). Takes a format string and
@@ -384,7 +384,7 @@ int ben_unpack(const struct bencode *b, const char *fmt, ...)
  *          preceeding conversion modifiers define the type of the value.
  */
 struct bencode *ben_pack(const char *fmt, ...)
-	CHECK_FORMAT(printf, 1, 2);
+	BEN_CHECK_FORMAT(printf, 1, 2);
 
 /* ben_is_bool() returns 1 iff b is a boolean, 0 otherwise */
 static inline int ben_is_bool(const struct bencode *b)
