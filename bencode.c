@@ -2100,10 +2100,40 @@ const char *ben_strerror(int error)
 	}
 }
 
+static int unpack_pointer(const struct bencode *b, struct ben_decode_ctx *ctx,
+			  va_list *vl)
+{
+	const char **str;
+	const struct bencode **ptr;
+
+	ctx->off++;
+
+	if (ctx->off >= ctx->len)
+		return insufficient(ctx);
+
+	switch (ben_current_char(ctx)) {
+	case 's': /* %ps */
+		ctx->off++;
+		if (b->type != BENCODE_STR)
+			return invalid(ctx);
+		str = va_arg(*vl, const char **);
+		*str = ben_str_val(b);
+		return 0;
+
+	case 'b': /* %pb */
+		ctx->off++;
+		ptr = va_arg(*vl, const struct bencode **);
+		*ptr = b;
+		return 0;
+
+	default:
+		return invalid(ctx);
+	}
+}
+
 static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			va_list *vl)
 {
-	const char **str;
 	long long val;
 	long long *ll;
 	long *l;
@@ -2128,12 +2158,7 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			break;
 
 		case 'p':
-			ctx->off++;
-			if (b->type != BENCODE_STR)
-				return invalid(ctx);
-			str = va_arg(*vl, const char **);
-			*str = ben_str_val(b);
-			return 0;
+			return unpack_pointer(b, ctx, vl);
 
 		/* signed */
 		case 'd':
@@ -2194,7 +2219,7 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 			return invalid(ctx);
 		}
 	}
-	return -1;
+	return insufficient(ctx);
 }
 
 static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
@@ -2330,6 +2355,26 @@ int ben_unpack(const struct bencode *b, const char *fmt, ...)
 	return ret;
 }
 
+static struct bencode *pack_pointer(struct ben_decode_ctx *ctx, va_list *vl)
+{
+	struct bencode *b = NULL;
+
+	ctx->off++;
+
+	if (ctx->off >= ctx->len)
+		return ben_insufficient_ptr(ctx);
+
+	switch (ben_current_char(ctx)) {
+	case 'b': /* %pb */
+		ctx->off++;
+		b = va_arg(*vl, struct bencode *);
+		break;
+	default:
+		return ben_invalid_ptr(ctx);
+	}
+	return b;
+}
+
 static struct bencode *pack_value(struct ben_decode_ctx *ctx, va_list *vl)
 {
 	struct bencode *b = NULL;
@@ -2356,6 +2401,10 @@ static struct bencode *pack_value(struct ben_decode_ctx *ctx, va_list *vl)
 			b = ben_str(va_arg(*vl, const char *));
 			if (b == NULL)
 				return ben_oom_ptr(ctx);
+			break;
+
+		case 'p':
+			b = pack_pointer(ctx, vl);
 			break;
 
 		/* signed */
@@ -2410,7 +2459,7 @@ static struct bencode *pack_value(struct ben_decode_ctx *ctx, va_list *vl)
 		if (b)
 			return b;
 	}
-	return NULL;
+	return ben_insufficient_ptr(ctx);
 }
 
 static struct bencode *pack_dict(struct ben_decode_ctx *ctx, va_list *vl)

@@ -343,16 +343,22 @@ const char *ben_strerror(int error);
  *     q    Same as ll.
  *
  * Unpack specifiers:
- *     p    The Bencode value must be a string and a pointer to a string
+ *     %ps  The Bencode value must be a string and a pointer to a string
  *          (char **) is expected to be given as arguments. Note, returns a
  *          reference to the internal string buffer. The returned memory should
  *          not be freed and it has the same life time as the Bencode string.
  *
- *     d    The bencode value is expected to be a (signed) integer. The
+ *     %pb  Takes any structure and writes a pointer given as an argument.
+ *          The argument is expected to be "struct bencode **". Note, returns a
+ *          reference to the value inside the structure passed to ben_unpack().
+ *          The returned memory should not be freed and it has the same life
+ *          time as the original structure.
+ *
+ *     %d   The bencode value is expected to be a (signed) integer. The
  *          preceeding conversion modifiers define the type of the given
  *          pointer.
 
- *     u    The bencode value is expected to be an unsigned integer. The
+ *     %u   The bencode value is expected to be an unsigned integer. The
  *          preceeding conversion modifiers define the type of the given
  *          pointer.
  */
@@ -374,13 +380,17 @@ int ben_unpack(const struct bencode *b, const char *fmt, ...)
  *     q    Same as ll.
  *
  * Value specifiers:
- *     s    A string pointer (char *) expected to be given as arguments. A new
+ *     %s   A string pointer (char *) expected to be given as argument. A new
  *          Bencode string is constructed from the given string.
  *
- *     d    Constructs a new integer from the given (signed) integer. The
+ *     %pb  A Bencode structure (struct bencode *) is expected to be given as
+ *          argument. Note, takes ownership of the structure, even when an
+ *          error is returned.
+ *
+ *     %d   Constructs a new integer from the given (signed) integer. The
  *          preceeding conversion modifiers define the type of the value.
-
- *     u    Constructs a new integer from the given unsigned integer. The
+ *
+ *     %u   Constructs a new integer from the given unsigned integer. The
  *          preceeding conversion modifiers define the type of the value.
  */
 struct bencode *ben_pack(const char *fmt, ...)

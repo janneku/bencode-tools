@@ -1113,27 +1113,27 @@ void unpack_tests(void)
 	};
 	/* each format string must refer to at most three strings */
 	const struct test table[] = {
-		{.encoded = "l3:fooe", .len = -1, .fmt = "[%p, ]"},
+		{.encoded = "l3:fooe", .len = -1, .fmt = "[%ps, ]"},
 		{.encoded = "l3:fooe", .len = -1, .fmt = "[%d, ]", .e = 1},
 		{.encoded = "ldee", .len = -1, .fmt = "[{}]"},
 		{.encoded = "ldee", .len = -1, .fmt = "[", .e = 1},
 		{.encoded = "de", .len = -1, .fmt = "{", .e = 1},
 		{.encoded = "ldee", .len = -1, .fmt = "[]", .e = 1},
-		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %p}"},
-		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'error': %p}", .e = 1},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %ps}"},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'error': %ps}", .e = 1},
 		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %d}", .e = 1},
-		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{ 'foo': %p }"},
-		{.encoded = "d3:foo3:bar3:keyi123ee", .len = -1, .fmt = "{'foo': %p}"},
-		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[%p, %p]"},
-		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[ %p, %p ] "},
-		{.encoded = "l3:food3:key3:valee", .len = -1, .fmt = "[%p, {'key': %p}]"},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{ 'foo': %ps }"},
+		{.encoded = "d3:foo3:bar3:keyi123ee", .len = -1, .fmt = "{'foo': %ps}"},
+		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[%ps, %ps]"},
+		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[ %ps, %ps ] "},
+		{.encoded = "l3:food3:key3:valee", .len = -1, .fmt = "[%ps, {'key': %ps}]"},
 		{.encoded = NULL,},
 	};
 	const char *s = "d6:author5:Alice6:lengthi100000e4:name8:spam.mp3e";
 	const char *s2 = "l5:Alice8:spam.mp3e";
 
 	char *author;
-	char *name;
+	const struct bencode *name;
 	long length;
 	size_t i;
 	char *str1;
@@ -1167,18 +1167,18 @@ void unpack_tests(void)
 	b = ben_decode(s, strlen(s));
 	assert(b != NULL);
 
-	assert(ben_unpack(b, "{\"author\": %p, \"name\": %p, \"length\": %ld}",
+	assert(ben_unpack(b, "{\"author\": %ps, \"name\": %pb, \"length\": %ld}",
 			  &author, &name, &length) == 0);
 	assert(strcmp(author, "Alice") == 0);
-	assert(strcmp(name, "spam.mp3") == 0);
+	assert(strcmp(ben_str_val(name), "spam.mp3") == 0);
 	assert(length == 100000);
 	ben_free(b);
 
 	b = ben_decode(s2, strlen(s2));
 	assert(b != NULL);
-	assert(ben_unpack(b, "[%p, %p]", &author, &name) == 0);
+	assert(ben_unpack(b, "[%ps, %pb]", &author, &name) == 0);
 	assert(strcmp(author, "Alice") == 0);
-	assert(strcmp(name, "spam.mp3") == 0);
+	assert(strcmp(ben_str_val(name), "spam.mp3") == 0);
 	ben_free(b);
 }
 
@@ -1189,9 +1189,10 @@ void pack_tests(void)
 	size_t len;
 	const char *s = "d6:author5:Alice6:lengthi100000e4:name8:spam.mp3e";
 	const char *s2 = "l5:Alice8:spam.mp3b0e";
+	struct bencode *name = ben_str("spam.mp3");
 
-	b = ben_pack("{'author': %s, 'name': 'spam.mp3', 'length': %d}",
-		     "Alice", 100000);
+	b = ben_pack("{'author': %s, 'name': %pb, 'length': %d}",
+		     "Alice", name, 100000);
 	assert(b != NULL);
 
 	encoded = ben_encode(&len, b);
