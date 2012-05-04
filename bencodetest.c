@@ -1199,6 +1199,7 @@ void pack_tests(void)
 	assert(encoded != NULL);
 	assert(len == strlen(s));
 	assert(memcmp(encoded, s, len) == 0);
+	ben_free(b);
 	free(encoded);
 
 	b = ben_pack("[%s, 'spam.mp3', False]", "Alice");
@@ -1208,6 +1209,7 @@ void pack_tests(void)
 	assert(encoded != NULL);
 	assert(len == strlen(s2));
 	assert(memcmp(encoded, s2, len) == 0);
+	ben_free(b);
 	free(encoded);
 }
 
