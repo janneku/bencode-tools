@@ -11,6 +11,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Used to verify format strings in compile time */
 #ifdef __GNUC__
 #define BEN_CHECK_FORMAT(args...)  __attribute__ ((format( args )))
@@ -695,5 +699,9 @@ int ben_put_char(struct ben_encode_ctx *ctx, char c);
  * This function is used to implement encoders for user-defined types.
  */
 int ben_put_buffer(struct ben_encode_ctx *ctx, const void *buf, size_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
