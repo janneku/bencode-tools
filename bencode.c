@@ -101,6 +101,12 @@ static int invalid(struct ben_decode_ctx *ctx)
 	return -1;
 }
 
+static int mismatch(struct ben_decode_ctx *ctx)
+{
+	ctx->error = BEN_MISMATCH;
+	return -1;
+}
+
 void *ben_insufficient_ptr(struct ben_decode_ctx *ctx)
 {
 	ctx->error = BEN_INSUFFICIENT;
@@ -2094,6 +2100,8 @@ const char *ben_strerror(int error)
 		return "Insufficient amount of data (need more data)";
 	case BEN_NO_MEMORY:
 		return "Out of memory";
+	case BEN_MISMATCH:
+		return "A given structure did not match unpack format";
 	default:
 		fprintf(stderr, "Unknown error code: %d\n", error);
 		return NULL;
@@ -2115,7 +2123,7 @@ static int unpack_pointer(const struct bencode *b, struct ben_decode_ctx *ctx,
 	case 's': /* %ps */
 		ctx->off++;
 		if (b->type != BENCODE_STR)
-			return invalid(ctx);
+			return mismatch(ctx);
 		str = va_arg(*vl, const char **);
 		*str = ben_str_val(b);
 		return 0;
@@ -2164,7 +2172,7 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 		case 'd':
 			ctx->off++;
 			if (b->type != BENCODE_INT)
-				return invalid(ctx);
+				return mismatch(ctx);
 			val = ben_int_val(b);
 			switch (longflag) {
 			case 0:
@@ -2172,13 +2180,13 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 				*i = val;
 				/* Test that no information was lost in conversion */
 				if ((long long) *i != val)
-					return invalid(ctx);
+					return mismatch(ctx);
 				break;
 			case 1:
 				l = va_arg(*vl, long *);
 				*l = val;
 				if ((long long) *l != val)
-					return invalid(ctx);
+					return mismatch(ctx);
 				break;
 			case 2:
 				ll = va_arg(*vl, long long *);
@@ -2191,22 +2199,22 @@ static int unpack_value(const struct bencode *b, struct ben_decode_ctx *ctx,
 		case 'u':
 			ctx->off++;
 			if (b->type != BENCODE_INT)
-				return invalid(ctx);
+				return mismatch(ctx);
 			val = ben_int_val(b);
 			if (val < 0)
-				return invalid(ctx);
+				return mismatch(ctx);
 			switch (longflag) {
 			case 0:
 				ui = va_arg(*vl, unsigned int *);
 				*ui = val;
 				if ((long long) *ui != val)
-					return invalid(ctx);
+					return mismatch(ctx);
 				break;
 			case 1:
 				ul = va_arg(*vl, unsigned long *);
 				*ul = val;
 				if ((long long) *ul != val)
-					return invalid(ctx);
+					return mismatch(ctx);
 				break;
 			case 2:
 				ull = va_arg(*vl, unsigned long long *);
@@ -2229,7 +2237,7 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 	const struct bencode *val;
 
 	if (b->type != BENCODE_DICT)
-		return invalid(ctx);
+		return mismatch(ctx);
 
 	ctx->off++;
 
@@ -2292,17 +2300,27 @@ static int unpack_list(const struct bencode *b, struct ben_decode_ctx *ctx,
 		       va_list *vl)
 {
 	const struct bencode_list *list;
-	size_t i;
+	size_t i = 0;
 
 	if (b->type != BENCODE_LIST)
-		return invalid(ctx);
+		return mismatch(ctx);
 	list = ben_list_const_cast(b);
 
 	ctx->off++;
 
-	for (i = 0; i < list->n; ++i) {
+	while (1) {
+		if (seek_char(ctx))
+			return -1;
+
+		if (ben_current_char(ctx) == ']') {
+			ctx->off++;
+			break;
+		}
+		if (i >= list->n)
+			return mismatch(ctx);
 		if (unpack(list->values[i], ctx, vl))
 			return -1;
+		i++;
 
 		if (seek_char(ctx))
 			return -1;
@@ -2311,11 +2329,8 @@ static int unpack_list(const struct bencode *b, struct ben_decode_ctx *ctx,
 		else if (ben_current_char(ctx) != ']')
 			return invalid(ctx);
 	}
-	if (seek_char(ctx))
-		return -1;
-	if (ben_current_char(ctx) != ']')
-		return invalid(ctx);
-	ctx->off++;
+	if (i != list->n)
+		return mismatch(ctx);
 	return 0;
 }
 
@@ -2346,12 +2361,14 @@ int ben_unpack(const struct bencode *b, const char *fmt, ...)
 	va_start(vl, fmt);
 	ret = unpack(b, &ctx, &vl);
 	va_end(vl);
+	if (ret)
+		return -1;
 
 	/* check for left over characters */
 	seek_char(&ctx);
 	if (ctx.off < ctx.len)
-		ret = -1;
-	return ret;
+		return invalid(&ctx);
+	return 0;
 }
 
 static struct bencode *pack_pointer(struct ben_decode_ctx *ctx, va_list *vl)

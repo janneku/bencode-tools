@@ -36,6 +36,7 @@ enum {
 	BEN_INVALID,      /* Invalid data was given to decoder */
 	BEN_INSUFFICIENT, /* Insufficient amount of data for decoding */
 	BEN_NO_MEMORY,    /* Memory allocation failed */
+	BEN_MISMATCH,     /* A given structure did not match unpack format */
 };
 
 struct bencode {
