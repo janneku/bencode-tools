@@ -370,6 +370,9 @@ const char *ben_strerror(int error);
 int ben_unpack(const struct bencode *b, const char *fmt, ...)
 	BEN_CHECK_FORMAT(scanf, 2, 3);
 
+int ben_unpack2(const struct bencode *b, size_t *off, struct bencode_error *error, const char *fmt, ...)
+	BEN_CHECK_FORMAT(scanf, 4, 5);
+
 /*
  * Pack a Bencoded structure similar to printf(). Takes a format string and
  * a list of values as variable arguments.

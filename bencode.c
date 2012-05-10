@@ -2353,21 +2353,51 @@ static int unpack(const struct bencode *b, struct ben_decode_ctx *ctx,
 	return -1;
 }
 
+static int unpack_all(const struct bencode *b, struct ben_decode_ctx *ctx,
+		      va_list *vl)
+{
+	if (unpack(b, ctx, vl))
+		return -1;
+	/* check for left over characters */
+	seek_char(ctx);
+	ctx->error = 0;
+	if (ctx->off < ctx->len)
+		return invalid(ctx);
+	return 0;
+}
+
 int ben_unpack(const struct bencode *b, const char *fmt, ...)
 {
 	struct ben_decode_ctx ctx = {.data = fmt, .len = strlen(fmt)};
 	int ret;
 	va_list vl;
 	va_start(vl, fmt);
-	ret = unpack(b, &ctx, &vl);
+	ret = unpack_all(b, &ctx, &vl);
 	va_end(vl);
-	if (ret)
-		return -1;
+	return ret;
+}
 
-	/* check for left over characters */
-	seek_char(&ctx);
-	if (ctx.off < ctx.len)
-		return invalid(&ctx);
+int ben_unpack2(const struct bencode *b, size_t *off, struct bencode_error *error, const char *fmt, ...)
+{
+	struct ben_decode_ctx ctx = {.data = fmt, .len = strlen(fmt)};
+	int ret;
+	va_list vl;
+	va_start(vl, fmt);
+	ret = unpack_all(b, &ctx, &vl);
+	va_end(vl);
+
+	*off = ctx.off;
+	if (error != NULL) {
+		assert((ret == 0) ^ (ctx.error != 0));
+		error->error = ctx.error;
+		if (ret != 0) {
+			error->off = 0;
+			error->line = 0;
+		} else {
+			error->off = ctx.off;
+			error->line = ctx.line;
+		}
+	}
 	return 0;
 }
 

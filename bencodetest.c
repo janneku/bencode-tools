@@ -1114,14 +1114,14 @@ void unpack_tests(void)
 	/* each format string must refer to at most three strings */
 	const struct test table[] = {
 		{.encoded = "l3:fooe", .len = -1, .fmt = "[%ps, ]"},
-		{.encoded = "l3:fooe", .len = -1, .fmt = "[%d, ]", .e = 1},
+		{.encoded = "l3:fooe", .len = -1, .fmt = "[%d, ]", .e = BEN_MISMATCH},
 		{.encoded = "ldee", .len = -1, .fmt = "[{}]"},
-		{.encoded = "ldee", .len = -1, .fmt = "[", .e = 1},
-		{.encoded = "de", .len = -1, .fmt = "{", .e = 1},
-		{.encoded = "ldee", .len = -1, .fmt = "[]", .e = 1},
+		{.encoded = "ldee", .len = -1, .fmt = "[", .e = BEN_INSUFFICIENT},
+		{.encoded = "de", .len = -1, .fmt = "{", .e = BEN_INSUFFICIENT},
+		{.encoded = "ldee", .len = -1, .fmt = "[]", .e = BEN_MISMATCH},
 		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %ps}"},
-		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'error': %ps}", .e = 1},
-		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %d}", .e = 1},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'error': %ps}", .e = BEN_MISMATCH},
+		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{'foo': %d}", .e = BEN_MISMATCH},
 		{.encoded = "d3:foo3:bare", .len = -1, .fmt = "{ 'foo': %ps }"},
 		{.encoded = "d3:foo3:bar3:keyi123ee", .len = -1, .fmt = "{'foo': %ps}"},
 		{.encoded = "l3:foo3:bare", .len = -1, .fmt = "[%ps, %ps]"},
@@ -1140,6 +1140,8 @@ void unpack_tests(void)
 	char *str2;
 	char *str3;
 	struct bencode *b;
+	struct bencode_error error;
+	size_t off;
 
 	for (i = 0; table[i].encoded != NULL; i++) {
 		const char *encoded = table[i].encoded;
@@ -1152,13 +1154,10 @@ void unpack_tests(void)
 			fprintf(stderr, "Failed to decode: %s\n", encoded);
 			exit(1);
 		}
-		if (ben_unpack(b, fmt, &str1, &str2, &str3)) {
-			if (table[i].e == 0) {
-				fprintf(stderr, "Failed to unpack: %s\n", fmt);
-				exit(1);
-			}
-		} else if (table[i].e) {
-			fprintf(stderr, "Unexpected unpack success: %s\n", fmt);
+		ben_unpack2(b, &off, &error, fmt, &str1, &str2, &str3);
+		if (error.error != table[i].e) {
+			fprintf(stderr, "Unpack test failed: %s (%d != %d)\n", fmt,
+				error.error, table[i].e);
 			exit(1);
 		}
 		ben_free(b);
