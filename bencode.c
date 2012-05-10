@@ -2313,9 +2313,8 @@ static int unpack_list(const struct bencode *b, struct ben_decode_ctx *ctx,
 	}
 	if (seek_char(ctx))
 		return -1;
-
 	if (ben_current_char(ctx) != ']')
-		return -1;
+		return invalid(ctx);
 	ctx->off++;
 	return 0;
 }
