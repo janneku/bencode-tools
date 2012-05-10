@@ -2275,7 +2275,7 @@ static int unpack_dict(const struct bencode *b, struct ben_decode_ctx *ctx,
 		val = ben_dict_get(b, key);
 		ben_free(key);
 		if (val == NULL)
-			return -1;
+			return mismatch(ctx);
 
 		if (seek_char(ctx))
 			return -1;
