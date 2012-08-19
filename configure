@@ -48,6 +48,10 @@ if test ! -z "$packageprefix" ; then
     libpath="$packageprefix/$libpath"
 fi
 
+if [ "${prefix}" != "${HOME}" ]; then
+    python_install_option="${python_install_option} --prefix=${prefix}"
+fi
+
 if test -z "$CC" ; then
     CC=gcc
 fi

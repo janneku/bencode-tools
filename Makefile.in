@@ -40,7 +40,7 @@ install:
 	install bencat "$(PREFIX)/bin/"
 	@echo
 	@echo "Installing Python packages"
-	python setup.py install "$(PYTHON_INSTALL_OPTION)"
+	python setup.py install $(PYTHON_INSTALL_OPTION)
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $<
