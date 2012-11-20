@@ -247,7 +247,7 @@ static struct bencode *clone_dict(const struct bencode_dict *d)
 	struct bencode *newdict = ben_dict();
 	if (newdict == NULL)
 		return NULL;
-	ben_dict_for_each(key, value, pos, d) {
+	ben_dict_for_each(key, value, pos, (const struct bencode *) d) {
 		newkey = ben_clone(key);
 		newvalue = ben_clone(value);
 		if (newkey == NULL || newvalue == NULL) {
@@ -278,7 +278,7 @@ static struct bencode *clone_list(const struct bencode_list *list)
 	struct bencode *newlist = ben_list();
 	if (newlist == NULL)
 		return NULL;
-	ben_list_for_each(value, pos, list) {
+	ben_list_for_each(value, pos, (const struct bencode *) list) {
 		newvalue = ben_clone(value);
 		if (newvalue == NULL)
 			goto error;
