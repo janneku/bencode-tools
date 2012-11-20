@@ -225,7 +225,10 @@ void *ben_encode(size_t *len, const struct bencode *b);
  */
 size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b);
 
-/* You must use ben_free() for all allocated bencode structures after use */
+/*
+ * You must use ben_free() for all allocated bencode structures after use.
+ * If b == NULL, ben_free does nothing.
+ */
 void ben_free(struct bencode *b);
 
 long long ben_str_hash(const struct bencode *b);
