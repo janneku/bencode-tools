@@ -575,7 +575,7 @@ static inline const char *ben_str_val(const struct bencode *b)
  */
 #define ben_list_for_each(value, pos, l) \
 	for ((pos) = 0; \
-	     (pos) < ((const struct bencode_list *) (l))->n && \
+	     (pos) < (ben_list_const_cast(l))->n && \
 	     ((value) = ((const struct bencode_list *) (l))->values[(pos)]) != NULL ; \
 	     (pos)++)
 
@@ -619,7 +619,7 @@ static inline struct bencode *ben_list_pop_current(struct bencode *list, size_t 
  */
 #define ben_dict_for_each(bkey, bvalue, pos, d) \
 	for ((pos) = 0; \
-	     (pos) < ((const struct bencode_dict *) (d))->n && \
+	     (pos) < (ben_dict_const_cast(d))->n && \
 	     ((bkey) = ((const struct bencode_dict *) (d))->nodes[(pos)].key) != NULL && \
 	     ((bvalue) = ((const struct bencode_dict *) (d))->nodes[(pos)].value) != NULL; \
 	     (pos)++)
