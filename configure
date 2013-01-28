@@ -2,31 +2,59 @@
 
 prefix=/usr/local
 libpath=""
+
+cc="$CC"
+if [[ -z "$cc" ]] ; then
+  cc=gcc
+fi
+no_c=""
+
 python_install_option=""
+python="python"
+no_python=""
+
+targets=""
 
 for opt in "$@" ; do
 	case $opt in
 	--lib-path=*)
-		libpath=$(echo $opt | sed -n 's/--lib-path=\(.*\)/\1/p')
+		libpath=$(echo "$opt" | sed -n 's/--lib-path=\(.*\)/\1/p')
 		;;
 	--prefix=*)
-		prefix=`echo $opt | sed -n 's/--prefix=\(.*\)/\1/p'`
+		prefix=`echo "$opt" | sed -n 's/--prefix=\(.*\)/\1/p'`
 		;;
 	--package-prefix=*)
-		packageprefix=`echo $opt | sed -n 's/--package-prefix=\(.*\)/\1/p'`
+		packageprefix=`echo "$opt" | sed -n 's/--package-prefix=\(.*\)/\1/p'`
 		;;
 	--home)
 		prefix="$HOME"
 		LDFLAGS="-L$HOME/lib -Wl,-rpath,$HOME/lib"
 		python_install_option="--user"
 		;;
+  --c-compiler=*)
+	  cc=`echo "$opt" | sed -n 's/--c-compiler=\(.*\)/\1/p'`
+    ;;
+  --python=*)
+		python=`echo "$opt" | sed -n 's/--python=\(.*\)/\1/p'`
+		;;
+  --without-c)
+    no_c="true"
+    ;;
+  --without-python)
+    no_python="true"
+    ;;
 	--help)
 		echo ""
 		echo "Valid options are:"
-		echo "--lib-path=dir         Install libraries to 'dir'"
-		echo "--prefix=dir           Install program to prefix 'dir'"
+		echo "--lib-path=dir         Install libraries to 'dir'."
+		echo "--prefix=dir           Install program to prefix 'dir'."
  		echo "--package-prefix=dest  Pretend to install to the prefix,"
-		echo "                       but copy files to 'dest/prefix' on make install"
+		echo "                       but copy files to 'dest/prefix' on make install."
+		echo "--home                 Install bencode libraries to $HOME directory."
+		echo "--c-compiler=exe       Use given C compiler."
+		echo "--python=exe           Use given Python interpreter for installation."
+		echo "--without-c            Don't install C library."
+		echo "--without-python       Don't install Python library."
 		exit
 		;;
 	*)
@@ -35,25 +63,45 @@ for opt in "$@" ; do
 	esac
 done
 
-if test -z "$libpath" ; then
-	if test -d "$prefix/lib64"; then
+if [[ -n $no_python ]] ; then
+  python="/bin/false"
+fi
+"$python" --version >/dev/null 2>/dev/null
+if [[ $? = 0 ]] ; then
+  targets="python $targets"
+else
+  if [[ -z $no_python ]] ; then
+    echo "Python interpreter not found: $python"
+    exit 1
+  fi
+  python=""
+fi
+
+if [[ -z "$libpath" ]] ; then
+	if [[ -d "$prefix/lib64" ]] ; then
 		libpath="$prefix/lib64"
 	else
 		libpath="$prefix/lib"
 	fi
 fi
 
-if test ! -z "$packageprefix" ; then
-    prefix="$packageprefix/$prefix"
-    libpath="$packageprefix/$libpath"
+if [[ ! -z "$packageprefix" ]] ; then
+  prefix="$packageprefix/$prefix"
+  libpath="$packageprefix/$libpath"
 fi
 
-if [[ "$prefix" != $HOME ]]; then
-    python_install_option="$python_install_option --prefix=\"$prefix\""
+if [[ -n $no_c ]] ; then
+  cc="/bin/false"
 fi
-
-if test -z "$CC" ; then
-    CC=gcc
+"$cc" --version >/dev/null 2>/dev/null
+if [[ $? = 0 ]] ; then
+  targets="c $targets"
+else
+  if [[ -z $no_c ]] ; then
+    echo "C compiler not found: $cc"
+    exit 1
+  fi
+  cc=""
 fi
 
 # Linux shared library config
@@ -62,15 +110,22 @@ SHAREDFLAG="-shared"
 LIBNAME="libbencodetools.so"
 SHAREDNAMEFLAG="-Wl,-soname,$LIBNAME"
 if test "x$(uname)" = "xDarwin" ; then
-    # Mac OS X shared library config
-    SHAREDLIBRARYFLAGS="-dynamic -bundle -undefined suppress -force_flat_namespace"
-    SHAREDFLAG="-dynamiclib"
-    LIBNAME="libbencodetools.dylib"
-    SHAREDNAMEFLAG="-install_name \$(PREFIX)/lib/$LIBNAME"
+  # Mac OS X shared library config
+  SHAREDLIBRARYFLAGS="-dynamic -bundle -undefined suppress -force_flat_namespace"
+  SHAREDFLAG="-dynamiclib"
+  LIBNAME="libbencodetools.dylib"
+  SHAREDNAMEFLAG="-install_name \$(PREFIX)/lib/$LIBNAME"
 fi
 
+compile_targets=""
+install_targets=""
+for target in $targets ; do
+  compile_targets="$compile_targets compile-$target"
+  install_targets="$install_targets install-$target"
+done
+
 sed -e "s|{PREFIX}|$prefix|g" \
-    -e "s|{CC}|$CC|g" \
+    -e "s|{CC}|$cc|g" \
     -e "s|{LIBPATH}|$libpath|g" \
     -e "s|{CFLAGS}|$CFLAGS|g" \
     -e "s|{LDFLAGS}|$LDFLAGS|g" \
@@ -78,12 +133,17 @@ sed -e "s|{PREFIX}|$prefix|g" \
     -e "s|{SHAREDFLAG}|$SHAREDFLAG|g" \
     -e "s|{SHAREDNAMEFLAG}|$SHAREDNAMEFLAG|g" \
     -e "s|{LIBNAME}|$LIBNAME|g" \
+    -e "s|{PYTHON}|$python|g" \
     -e "s|{PYTHON_INSTALL_OPTION}|$python_install_option|g" \
+    -e "s|{COMPILE_TARGETS}|$compile_targets|g" \
+    -e "s|{INSTALL_TARGETS}|$install_targets|g" \
     < Makefile.in > Makefile
 
 echo
 echo "Install prefix:  $prefix"
 echo "Library path:    $libpath"
-echo "Compiler:        $CC"
+echo "Compiler:        $cc"
+echo "Python:          $python"
+echo "Targets:         $targets"
 echo
 echo "Configure successful"
