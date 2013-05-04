@@ -228,6 +228,9 @@ size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b);
 /*
  * You must use ben_free() for all allocated bencode structures after use.
  * If b == NULL, ben_free does nothing.
+ *
+ * ben_free() frees all the objects contained within the bencoded structure.
+ * It recursively iterates over lists and dictionaries and frees objects.
  */
 void ben_free(struct bencode *b);
 
