@@ -225,7 +225,13 @@ void *ben_encode(size_t *len, const struct bencode *b);
  */
 size_t ben_encode2(char *data, size_t maxlen, const struct bencode *b);
 
-/* You must use ben_free() for all allocated bencode structures after use */
+/*
+ * You must use ben_free() for all allocated bencode structures after use.
+ * If b == NULL, ben_free does nothing.
+ *
+ * ben_free() frees all the objects contained within the bencoded structure.
+ * It recursively iterates over lists and dictionaries and frees objects.
+ */
 void ben_free(struct bencode *b);
 
 long long ben_str_hash(const struct bencode *b);
@@ -572,10 +578,19 @@ static inline const char *ben_str_val(const struct bencode *b)
  * using ben_list_pop_current().
  *
  * pos is a size_t.
+ *
+ * Example:
+ *
+ * size_t pos;
+ * struct bencode *list = xxx;
+ * struct bencode *value;
+ * ben_list_for_each(value, pos, list) {
+ *         inspect(value);
+ * }
  */
 #define ben_list_for_each(value, pos, l) \
-	for ((pos) = 0; \
-	     (pos) < ((const struct bencode_list *) (l))->n && \
+	for ((pos) = (size_t) 0;		    \
+	     (pos) < (ben_list_const_cast(l))->n && \
 	     ((value) = ((const struct bencode_list *) (l))->values[(pos)]) != NULL ; \
 	     (pos)++)
 
@@ -588,11 +603,12 @@ static inline const char *ben_str_val(const struct bencode *b)
  * Filter out all items from list whose string value does not begin with "foo".
  *
  * ben_list_for_each(value, pos, list) {
- *     if (strncmp(ben_str_val(value), "foo", 3) != 0)
- *         ben_free(ben_list_pop_current(&pos, list));
+ *         if (strncmp(ben_str_val(value), "foo", 3) != 0)
+ *                 ben_free(ben_list_pop_current(&pos, list));
  * }
  */
-static inline struct bencode *ben_list_pop_current(struct bencode *list, size_t *pos)
+static inline struct bencode *ben_list_pop_current(struct bencode *list,
+						   size_t *pos)
 {
 	struct bencode *value = ben_list_pop(list, *pos);
 	(*pos)--;
@@ -619,7 +635,7 @@ static inline struct bencode *ben_list_pop_current(struct bencode *list, size_t 
  */
 #define ben_dict_for_each(bkey, bvalue, pos, d) \
 	for ((pos) = 0; \
-	     (pos) < ((const struct bencode_dict *) (d))->n && \
+	     (pos) < (ben_dict_const_cast(d))->n && \
 	     ((bkey) = ((const struct bencode_dict *) (d))->nodes[(pos)].key) != NULL && \
 	     ((bvalue) = ((const struct bencode_dict *) (d))->nodes[(pos)].value) != NULL; \
 	     (pos)++)
